@@ -25,7 +25,8 @@ if PROXY_HTTP and PROXY_HTTPS:
 
 
 async def get_channels(force: bool = False):
-    if not is_latest_program_by_platform_name_over_6h(platform_name) and not force:
+    isOver6h = await is_latest_program_by_platform_name_over_6h(platform_name)
+    if not isOver6h and not force:
         logger.info(f"平台【{platform_name}】 距离上次更新不足6小时，本次不执行更新。")
         return
     logger.info(f"平台【{platform_name}】 正在执行更新")
