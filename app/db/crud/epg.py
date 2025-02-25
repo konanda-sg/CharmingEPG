@@ -58,8 +58,8 @@ async def is_latest_program_by_platform_name_over_6h(platform_name: str):
 
     # 查询该 Platform 下的最新 Program
     # 使用 values 只获取必要的字段
-    latest_program = await Program.filter(channel__platform=platform).order_by('-updated_at').values(
-        'updated_at').first()
+    latest_program = await Program.filter(channel__platform=platform).order_by('-updated_at').limit(1).values(
+        'updated_at')
 
     if not latest_program:
         # 如果没有找到 Program，返回 True
@@ -69,7 +69,7 @@ async def is_latest_program_by_platform_name_over_6h(platform_name: str):
     current_time = datetime.utcnow()
 
     # 检查 latest_program 的 updated_at 是否超过 6 小时
-    return (current_time - latest_program.updated_at) > timedelta(hours=6)
+    return (current_time - latest_program[0]['updated_at']) > timedelta(hours=6)
 
 
 async def get_recent_programs(platform_name: str):
