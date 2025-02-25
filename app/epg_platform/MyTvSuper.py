@@ -1,6 +1,7 @@
 import asyncio
 import os
 
+import pytz
 import requests
 from datetime import datetime, timedelta
 
@@ -133,6 +134,14 @@ async def request_epg(network_code, channel_name):
                 # 如果是最后一个节目，可以设定一个默认的结束时间，比如加30分钟
                 end_time = start_time + timedelta(minutes=30)
             await create_program(platform_name=platform_name, channel_name=channel_name, program_name=program_name,
-                                 description=program_description, start_time=start_time, end_time=end_time);
+                                 description=program_description, start_time=utc8_to_utc(start_time),
+                                 end_time=utc8_to_utc(end_time))
 
         return "Success"
+
+
+def utc8_to_utc(local_time: datetime):
+    eastern_eight = pytz.timezone('Asia/Shanghai')
+    local_time_with_tz = eastern_eight.localize(local_time)
+    utc_time = local_time_with_tz.astimezone(pytz.utc)
+    return utc_time
