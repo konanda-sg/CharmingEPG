@@ -1,6 +1,7 @@
 # app/db/crud/epg.py
 from datetime import datetime, timedelta
 
+import pytz
 from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
 
@@ -65,7 +66,7 @@ async def is_latest_program_by_platform_name_over_6h(platform_name: str):
         return True
 
     # 获取当前时间
-    current_time = datetime.utcnow()
+    current_time = datetime.utcnow().replace(tzinfo=pytz.utc)
 
     # 检查 latest_program 的 updated_at 是否超过 6 小时
     return (current_time - latest_program.updated_at) > timedelta(hours=6)
