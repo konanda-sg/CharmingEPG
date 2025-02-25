@@ -1,4 +1,5 @@
 # app/db/crud/epg.py
+from datetime import datetime, timedelta
 
 from tortoise.exceptions import IntegrityError
 
@@ -42,6 +43,28 @@ async def get_channel_by_platform(platform_name: str):
     platform = await Platform.get(name=platform_name)
     channels = await Channel.filter(platform=platform)
     return channels
+
+
+async def is_latest_program_by_platform_name_over_6h(platform_name: str):
+    # 查询对应的 Platform
+    platform = await Platform.filter(name=platform_name).first()
+
+    if not platform:
+        # 如果没有找到 Platform，返回 True
+        return True
+
+    # 查询该 Platform 下的最新 Program
+    latest_program = await Program.filter(channel__platform=platform).order_by('-updated_at').first()
+
+    if not latest_program:
+        # 如果没有找到 Program，返回 True
+        return True
+
+    # 获取当前时间
+    current_time = datetime.utcnow()
+
+    # 检查 latest_program 的 updated_at 是否超过 6 小时
+    return (current_time - latest_program.updated_at) > timedelta(hours=6)
 
 
 async def get_recent_programs(platform_name: str):

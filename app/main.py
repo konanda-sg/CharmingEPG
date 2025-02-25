@@ -6,6 +6,9 @@ from app.db.crud.epg import get_channel_by_platform, get_recent_programs
 from app.db.models.base import init_database
 from app.epg.EpgGenerator import generateEpg
 from app.epg_platform import MyTvSuper
+from loguru import logger
+
+logger.add("runtime.log")
 
 app = FastAPI()
 
@@ -15,9 +18,9 @@ async def root():
     return {"message": "Hello World"}
 
 
-@app.get("/tvb")
+@app.get("/update/tvb")
 async def request_my_tv_super_epg():
-    return await MyTvSuper.get_channels()
+    return await MyTvSuper.get_channels(force=True)
 
 
 @app.get("/epg/{platform}")
@@ -50,15 +53,4 @@ async def request_epg_by_platform(platform: str):
 @app.on_event("startup")
 async def startup():
     await init_database()
-
-# @router.post("/platforms/")
-# async def create_platform(name: str):
-#     return await epg.create_platform(name)
-#
-# @router.post("/channels/")
-# async def create_channel(platform_id: int, name: str, description: str):
-#     return await epg.create_channel(platform_id, name, description)
-#
-# @router.post("/programs/")
-# async def create_program(channel_id: int, name: str, description: str, start_time, end_time):
-#     return await epg.create_program(channel_id, name, description, start_time, end_time)
+    await MyTvSuper.get_channels()

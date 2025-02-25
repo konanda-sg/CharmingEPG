@@ -1,9 +1,7 @@
-import logging
+from loguru import logger
 
 import psycopg2
 from psycopg2 import pool
-
-logger = logging.getLogger('uvicorn.error')
 
 
 class DatabaseConnection:

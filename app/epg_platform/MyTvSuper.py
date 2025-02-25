@@ -5,15 +5,16 @@ import requests
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from app.db.crud.epg import create_platform, create_channel, create_program, delete_programs_by_channel
-import logging
+from app.db.crud.epg import create_platform, create_channel, create_program, delete_programs_by_channel, \
+    is_latest_program_by_platform_name_over_6h
+from loguru import logger
 
 load_dotenv(verbose=True, override=True)
 PROXY_HTTP = os.getenv("PROXY_HTTP", None)
 PROXY_HTTPS = os.getenv("PROXY_HTTPS", None)
 PROXIES = None
 
-logger = logging.getLogger('uvicorn.error')
+platform_name = "tvb"
 
 if PROXY_HTTP and PROXY_HTTPS:
     PROXIES = {
@@ -22,7 +23,11 @@ if PROXY_HTTP and PROXY_HTTPS:
     }
 
 
-async def get_channels():
+async def get_channels(force: bool = False):
+    if not is_latest_program_by_platform_name_over_6h(platform_name) and not force:
+        logger.info(f"平台【{platform_name}】 距离上次更新不足6小时，本次不执行更新。")
+        return
+    logger.info(f"平台【{platform_name}】 正在执行更新")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
@@ -100,7 +105,6 @@ async def request_epg(network_code, channel_name):
     if response.status_code == 200:
         logger.info(response.url)
         data = response.json()
-        platform_name = "MyTvSuper"
 
         await create_platform(platform_name)
         await create_channel(platform_name=platform_name, channel_name=channel_name)
