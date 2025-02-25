@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 
 from tortoise.exceptions import IntegrityError
+from tortoise.transactions import in_transaction
 
 from app.db.models.epg import Platform, Channel, Program
 
@@ -15,12 +16,13 @@ async def create_platform(name: str):
 
 
 async def create_channel(platform_name: str, channel_name: str):
-    platform = await Platform.get(name=platform_name)
-    channel = await Channel.get_or_none(name=channel_name, platform=platform)
-    if channel:
-        return await channel.update_or_create(platform=platform, name=channel_name)
-    else:
-        return await Channel.create(platform=platform, name=channel_name)
+    async with in_transaction():
+        platform = await Platform.get(name=platform_name)
+        channel = await Channel.get_or_none(name=channel_name, platform=platform)
+        if channel:
+            return channel  # 不再调用 update_or_create
+        else:
+            return await Channel.create(platform=platform, name=channel_name)
 
 
 async def delete_programs_by_channel(platform_name: str, channel_name: str):
@@ -41,7 +43,8 @@ async def create_program(platform_name: str, channel_name: str, program_name: st
 
 async def get_channel_by_platform(platform_name: str):
     platform = await Platform.get(name=platform_name)
-    channels = await Channel.filter(platform=platform)
+    # 使用 select_related 来减少查询次数
+    channels = await Channel.filter(platform=platform).select_related('platform')
     return channels
 
 
@@ -54,7 +57,9 @@ async def is_latest_program_by_platform_name_over_6h(platform_name: str):
         return True
 
     # 查询该 Platform 下的最新 Program
-    latest_program = await Program.filter(channel__platform=platform).order_by('-updated_at').first()
+    # 使用 values 只获取必要的字段
+    latest_program = await Program.filter(channel__platform=platform).order_by('-updated_at').values(
+        'updated_at').first()
 
     if not latest_program:
         # 如果没有找到 Program，返回 True
@@ -69,9 +74,9 @@ async def is_latest_program_by_platform_name_over_6h(platform_name: str):
 
 async def get_recent_programs(platform_name: str):
     platform = await Platform.get(name=platform_name)
-    # 查询指定平台的频道和相关的节目
+    # 使用 select_related 来减少查询次数
     programs = await Program.filter(
         channel__platform_id=platform.id,
-    ).prefetch_related('channel').all()
+    ).select_related('channel', 'channel__platform').all()
 
     return programs

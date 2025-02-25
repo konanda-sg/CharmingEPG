@@ -25,6 +25,7 @@ async def request_my_tv_super_epg():
 
 @app.get("/epg/{platform}")
 async def request_epg_by_platform(platform: str):
+    logger.info(f"正在拉取平台:【{platform}】的本地EPG")
     channels = await get_channel_by_platform(platform_name=platform)
     programs = await get_recent_programs(platform_name=platform)
 
@@ -32,8 +33,6 @@ async def request_epg_by_platform(platform: str):
     generate_programs = []
     for channel in channels:
         generate_channels.append({"channelName": channel.name})
-
-    print(generate_channels)
 
     for program in programs:
         generate_programs.append(
