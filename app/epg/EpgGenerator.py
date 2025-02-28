@@ -34,14 +34,6 @@ async def generateEpg(channels, programs):
             description = ET.SubElement(programme, "desc", lang="zh")
             description.text = description_str
 
-    # 指定文件名和路径
-    file_path = "output.txt"
-
-    # 使用 with 语句打开文件，确保文件在操作完成后被正确关闭
-    with open(file_path, "w") as file:
-        for line in data_list:
-            file.write(line + "\n")
-            # 转换为字符串并格式化
     xml_str = ET.tostring(tv, encoding='utf-8')
     return xml_str
 

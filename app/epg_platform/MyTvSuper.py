@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 
 import pytz
@@ -25,10 +26,10 @@ if PROXY_HTTP and PROXY_HTTPS:
 
 
 async def get_channels(force: bool = False):
-    isOver6h = await is_latest_program_by_platform_name_over_6h(platform_name)
-    if not isOver6h and not force:
-        logger.info(f"平台【{platform_name}】 距离上次更新不足6小时，本次不执行更新。")
-        return
+    # isOver6h = await is_latest_program_by_platform_name_over_6h(platform_name)
+    # if not isOver6h and not force:
+    #     logger.info(f"平台【{platform_name}】 距离上次更新不足6小时，本次不执行更新。")
+    #     return
     logger.info(f"平台【{platform_name}】 正在执行更新")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
@@ -58,15 +59,15 @@ async def get_channels(force: bool = False):
         data = response.json()
         logger.info(data)
 
-        async def process_channels(data):
-            for channel in data['channels']:
-                await request_epg(network_code=channel['network_code'], channel_name=channel['name_tc'])
-                # delay = random.randint(2, 5)
-                # await asyncio.sleep(delay)
+        rawChannels = []
+        rawPrograms = []
+        for channel in data['channels']:
+            rawChannels.append({"channelName": channel['name_tc']})
+            programData = await request_epg(network_code=channel['network_code'], channel_name=channel['name_tc'])
+            rawPrograms.extend(programData)
 
-        asyncio.create_task(process_channels(data))
-
-    return {"message": "Processing started in the background."}
+        return rawChannels, rawPrograms
+    return [], []
 
 
 async def request_epg(network_code, channel_name):
@@ -108,9 +109,9 @@ async def request_epg(network_code, channel_name):
         logger.info(response.url)
         data = response.json()
 
-        await create_platform(platform_name)
-        await create_channel(platform_name=platform_name, channel_name=channel_name)
-        await delete_programs_by_channel(platform_name=platform_name, channel_name=channel_name)
+        # await create_platform(platform_name)
+        # await create_channel(platform_name=platform_name, channel_name=channel_name)
+        # await delete_programs_by_channel(platform_name=platform_name, channel_name=channel_name)
 
         total_epg = []
 
@@ -119,6 +120,8 @@ async def request_epg(network_code, channel_name):
                 epgs = item['epg']
                 for epg in epgs:
                     total_epg.append(epg)
+
+        epgResult = []
 
         for i, epg_program in enumerate(total_epg):
             # 解析节目开始时间
@@ -134,11 +137,21 @@ async def request_epg(network_code, channel_name):
             else:
                 # 如果是最后一个节目，可以设定一个默认的结束时间，比如加30分钟
                 end_time = start_time + timedelta(minutes=30)
-            await create_program(platform_name=platform_name, channel_name=channel_name, program_name=program_name,
-                                 description=program_description, start_time=utc8_to_utc(start_time),
-                                 end_time=utc8_to_utc(end_time))
 
-        return "Success"
+            eastern_eight = pytz.timezone('Asia/Shanghai')
+            start_time_with_tz = eastern_eight.localize(start_time)
+            end_time_with_tz = eastern_eight.localize(end_time)
+
+            epgResult.append(
+                {"channelName": channel_name, "programName": program_name, "description": program_description,
+                 "start": start_time_with_tz, "end": end_time_with_tz
+                 }
+            )
+            # await create_program(platform_name=platform_name, channel_name=channel_name, program_name=program_name,
+            #                      description=program_description, start_time=utc8_to_utc(start_time),
+            #                      end_time=utc8_to_utc(end_time))
+
+        return epgResult
 
 
 def utc8_to_utc(local_time: datetime):
