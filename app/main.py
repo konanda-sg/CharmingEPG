@@ -43,10 +43,10 @@ async def request_epg_by_platform(platform: str):
              "description": program.description})
 
     response_xml: str = await generateEpg(generate_channels, generate_programs)
-    xml_doc = minidom.parseString(response_xml)
-    formatted_xml = xml_doc.toprettyxml(indent="  ")
+    # xml_doc = minidom.parseString(response_xml)
+    # formatted_xml = xml_doc.toprettyxml(indent="  ")
     # print(formatted_xml)
-    return Response(content=formatted_xml, media_type="application/xml")
+    return Response(content=response_xml, media_type="application/xml")
 
 
 @app.on_event("startup")
