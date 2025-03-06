@@ -1,8 +1,6 @@
 import html
-import logging
 import re
 import xml.etree.ElementTree as ET
-from datetime import datetime
 
 import pytz
 

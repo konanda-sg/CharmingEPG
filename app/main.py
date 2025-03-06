@@ -9,6 +9,8 @@ from app.epg.EpgGenerator import generateEpg
 from app.epg_platform import MyTvSuper
 from loguru import logger
 
+from app.epg_platform.NowTV import request_nowtv_today_epg
+
 logger.add("runtime.log")
 
 app = FastAPI()
@@ -27,11 +29,20 @@ scheduler = AsyncIOScheduler()
 async def cron_job():
     # 执行任务的内容，例如打印当前时间
     print(f"The current time is {datetime.now()}")
-    await request_my_tv_super_epg()
+    await request_all_epg_job()
+
+
+def mkdir_if_need(file_path):
+    # 获取文件的目录
+    directory = os.path.dirname(file_path)
+    # 检查目录是否存在，如果不存在则创建目录
+    if not os.path.exists(directory):
+        os.makedirs(directory)  # 创建多层目录
 
 
 async def request_my_tv_super_epg():
     file_path = get_epg_file_name_today("tvb")
+    mkdir_if_need(file_path)
     if not os.path.exists(file_path):
         channels, programs = await MyTvSuper.get_channels(force=True)
         response_xml = await gen_channel(channels, programs)
@@ -40,6 +51,20 @@ async def request_my_tv_super_epg():
             file.write(response_xml)
     else:
         print(f"今日mytvsuper epg已获取，不执行更新")
+    # 删除旧的EPG
+    delete_old_epg_file("tvb")
+
+
+async def request_now_tv_epg():
+    file_path = get_epg_file_name_today("nowtv")
+    mkdir_if_need(file_path)
+    if not os.path.exists(file_path):
+        response_xml = await request_nowtv_today_epg()
+        # 使用 with 语句打开文件，确保文件在操作完成后被正确关闭
+        with open(file_path, "wb") as file:
+            file.write(response_xml)
+    else:
+        print(f"今日nowtv epg已获取，不执行更新")
     # 删除旧的EPG
     delete_old_epg_file("tvb")
 
@@ -94,8 +119,22 @@ async def gen_channel(channels, programs):
     return await generateEpg(channels, programs)
 
 
+async def request_all_epg_job():
+    tasks = [
+        request_my_tv_super_epg(),
+        request_now_tv_epg()
+    ]
+    # 使用 asyncio.gather 来并发执行请求
+    for task in tasks:
+        try:
+            await task
+        except Exception as e:
+            # 处理异常，记录错误日志或其他处理方式
+            logger.error(f"请求EPG时发生错误: {str(e)}")
+
+
 @app.on_event("startup")
 async def startup():
     logger.info("定时任务启动")
     scheduler.start()
-    await request_my_tv_super_epg()
+    await request_all_epg_job()

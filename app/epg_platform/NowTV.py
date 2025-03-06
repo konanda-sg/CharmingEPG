@@ -1,0 +1,120 @@
+import json
+import os
+from datetime import datetime
+
+import requests
+from loguru import logger
+import xml.etree.ElementTree as ET
+
+from dotenv import load_dotenv
+import pytz
+
+load_dotenv(verbose=True, override=True)
+
+ChannelNoFilterTemp = os.getenv("CHANNEL_NO_FILTER", [])
+
+ChannelNoFilter = json.loads(ChannelNoFilterTemp)
+ChannelNoFilterStr = list(map(lambda x: str(x).zfill(3), ChannelNoFilter))
+PROXY_HTTP = os.getenv("PROXY_HTTP", None)
+PROXY_HTTPS = os.getenv("PROXY_HTTPS", None)
+UA = os.getenv("UA",
+               "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
+
+PROXIES = None
+
+if PROXY_HTTP and PROXY_HTTPS:
+    PROXIES = {
+        "http": PROXY_HTTP,
+        "https": PROXY_HTTP
+    }
+
+
+async def request_nowtv_today_epg():
+    xml_str = await get_now_tv_guide_to_epg(ChannelNoFilterStr, "all")
+    return xml_str
+
+
+async def get_now_tv_guide_to_epg(channel_numbers, cache_keyword):
+    current_date = datetime.now().date()
+    cache_key = f"{current_date}_{cache_keyword}"
+
+    epg7Day = await fetch_7day_epg(channel_numbers)
+    channels = get_local_channel_and_keys()
+    tv = ET.Element("tv", {"generator-info-name": "Charming"})
+
+    for sportChannel in channel_numbers:
+        channelName = find_channel_name(channels, "{0}".format(sportChannel))
+        # 创建 channel 元素
+        channel = ET.SubElement(tv, "channel", id=channelName)
+        display_name = ET.SubElement(channel, "display-name", lang="zh")
+        display_name.text = channelName
+
+    for day in range(1, 7 + 1):
+        epgArray = epg7Day[day]
+        for index, epgChild in enumerate(epgArray):
+            channelName = find_channel_name(channels, "{0}".format(channel_numbers[index]))
+            for epgItem in epgChild:
+                start_time = time_stamp_to_timezone_str(epgItem["start"] / 1000)
+                end_time = time_stamp_to_timezone_str(epgItem["end"] / 1000)
+                programme = ET.SubElement(tv, "programme", channel=channelName, start=start_time, stop=end_time)
+                title = ET.SubElement(programme, "title", lang="zh")
+                title.text = epgItem["name"]
+
+    # 转换为字符串并格式化
+    xml_str = ET.tostring(tv, encoding='utf-8')
+    return xml_str
+
+
+def time_stamp_to_timezone_str(timestamp_s):
+    utc_dt = datetime.fromtimestamp(timestamp_s, tz=pytz.UTC)
+    target_tz = pytz.timezone('Asia/Shanghai')
+    local_dt = utc_dt.astimezone(target_tz)
+    formatted_time = local_dt.strftime('%Y%m%d%H%M%S %z')
+    return formatted_time
+
+
+def get_local_channel_and_keys():
+    current_file_path = os.path.dirname(__file__)
+    with open(f'{current_file_path}/channels.json', 'r', encoding='utf-8') as f:
+        channels = json.load(f)
+    return channels
+
+
+def find_channel_name(channels, channel_no):
+    for item in channels:
+        if item["channelNo"] == channel_no:
+            return item["name"]
+
+
+async def fetch_7day_epg(channel_numbers):
+    sport_epg_cache = {}
+    MIN_DAY = 1
+    MaxDay = 7
+    HEADERS = {
+        'Accept': 'text/plain, */*; q=0.01',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Referer': 'https://nowplayer.now.com/tvguide',
+        'X-Requested-With': 'XMLHttpRequest',
+        'User-Agent': UA,
+    }
+    COOKIES = {
+        'LANG': 'zh'
+    }
+    for day in range(MIN_DAY, MaxDay + 1):
+        params = {
+            'channelIdList[]': channel_numbers,
+            'day': str(day),
+        }
+        response = requests.get(
+            'https://nowplayer.now.com/tvguide/epglist',
+            params=params,
+            headers=HEADERS,
+            cookies=COOKIES,
+            proxies=PROXIES,
+        )
+        logger.info(f"url:{response.url} status:{response.status_code}")
+        if response.status_code == 200:
+            response_json = response.json()
+            sport_epg_cache[day] = response.json()  # 假设返回 JSON 数据
+
+    return sport_epg_cache
