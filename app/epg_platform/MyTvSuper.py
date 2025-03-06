@@ -1,5 +1,3 @@
-import asyncio
-import json
 import os
 
 import pytz
@@ -7,8 +5,6 @@ import requests
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from app.db.crud.epg import create_platform, create_channel, create_program, delete_programs_by_channel, \
-    is_latest_program_by_platform_name_over_6h
 from loguru import logger
 
 load_dotenv(verbose=True, override=True)

@@ -1,6 +1,9 @@
 import asyncio
+import os
+from datetime import datetime
 
-from fastapi import FastAPI, Response
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from fastapi import FastAPI, Response, HTTPException
 
 from app.epg.EpgGenerator import generateEpg
 from app.epg_platform import MyTvSuper
@@ -13,36 +16,86 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": ""}
 
 
-@app.get("/update/tvb")
+# 创建一个scheduler实例
+scheduler = AsyncIOScheduler()
+
+
+@scheduler.scheduled_job('interval', minutes=10)
+async def cron_job():
+    # 执行任务的内容，例如打印当前时间
+    print(f"The current time is {datetime.now()}")
+    await request_my_tv_super_epg()
+
+
 async def request_my_tv_super_epg():
-    async def process_channels():
+    file_path = get_epg_file_name_today("tvb")
+    if not os.path.exists(file_path):
         channels, programs = await MyTvSuper.get_channels(force=True)
         response_xml = await gen_channel(channels, programs)
-        file_path = "mytvsuper.xml"
-
         # 使用 with 语句打开文件，确保文件在操作完成后被正确关闭
         with open(file_path, "wb") as file:
             file.write(response_xml)
+    else:
+        print(f"今日mytvsuper epg已获取，不执行更新")
+    # 删除旧的EPG
+    delete_old_epg_file("tvb")
 
-    asyncio.create_task(process_channels())
 
-    return {"result": "running"}
+def get_date_str():
+    # 获取当前时间
+    current_time = datetime.now()
+    # 格式化当前时间为 YYYYMMDD
+    formatted_time = current_time.strftime('%Y%m%d')
+    return formatted_time
+
+
+def get_epg_file_name_today(platform):
+    """
+    获取今天的epg文件名
+    :param platform:
+    :return:
+    """
+    current_directory = os.getcwd()
+    epgDir = f'{current_directory}/epg_files/{platform}'
+    return f'{epgDir}/{platform}_{get_date_str()}.xml'
+
+
+def delete_old_epg_file(platform):
+    """
+    删除旧的EPG
+    :param platform:
+    :return:
+    """
+    current_directory = os.getcwd()
+    epgDir = f'{current_directory}/epg_files/{platform}'
+    todayFile = os.path.basename(get_epg_file_name_today(platform))  # 获取今天的文件名
+    for file in os.listdir(epgDir):
+        if file.endswith(".xml"):
+            if file != todayFile:
+                os.remove(os.path.join(epgDir, file))
+                logger.info(f"删除旧的EPG：{file}")
 
 
 @app.get("/epg/{platform}")
 async def request_epg_by_platform(platform: str):
-    with open(platform, "rb") as file:  # 使用 'rb' 模式
-        xml_bytes = file.read()  # 读取文件内容，返回 bytes
+    filePath = get_epg_file_name_today(platform)
+    if os.path.exists(filePath):
+        with open(filePath, "rb") as file:  # 使用 'rb' 模式
+            xml_bytes = file.read()  # 读取文件内容，返回 bytes
         return Response(content=xml_bytes, media_type="application/xml")
+    else:
+        raise HTTPException(status_code=404)
 
 
 async def gen_channel(channels, programs):
     return await generateEpg(channels, programs)
 
-# @app.on_event("startup")
-# async def startup():
-#     await init_database()
-#     await MyTvSuper.get_channels()
+
+@app.on_event("startup")
+async def startup():
+    logger.info("定时任务启动")
+    scheduler.start()
+    await request_my_tv_super_epg()
