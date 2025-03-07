@@ -13,7 +13,7 @@ from app.epg_platform.NowTV import request_nowtv_today_epg
 
 logger.add("runtime.log")
 
-app = FastAPI()
+app = FastAPI(openapi_url=None, redoc_url=None)
 
 
 @app.get("/")
