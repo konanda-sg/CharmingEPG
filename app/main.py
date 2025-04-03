@@ -3,11 +3,12 @@ import os
 from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI, Response, HTTPException
+from fastapi import FastAPI, Response, HTTPException, Query
 
 from app.epg.EpgGenerator import generateEpg
 from app.epg_platform import MyTvSuper
 from loguru import logger
+import xml.etree.ElementTree as ET
 
 from app.epg_platform.NowTV import request_nowtv_today_epg
 
@@ -113,6 +114,64 @@ async def request_epg_by_platform(platform: str):
         return Response(content=xml_bytes, media_type="application/xml")
     else:
         raise HTTPException(status_code=404)
+
+
+@app.get("/epg")
+async def custom_aggregate_epg(platforms: str = Query(..., description="平台列表，用逗号分隔，按优先级排序")):
+    """
+    自定义聚合EPG数据
+
+    platforms参数示例: ?platforms=tvb,nowtv,hami
+    """
+    # 分割平台列表
+    platform_list = [p.strip() for p in platforms.split(',') if p.strip()]
+    return await checkout_epg_multiple(platform_list)
+
+
+@app.get("/all")
+async def aggregate_epg():
+    platform_list = ["tvb", "nowtv"]
+    return await checkout_epg_multiple(platform_list)  # 按优先级排序的平台列表
+
+
+async def checkout_epg_multiple(platform_list):
+    merged_root = ET.Element("tv")
+    merged_root.set("generator-info-name", "Charming Aggregate")
+
+    channels_seen = set()  # 跟踪已处理的channel id
+
+    for platform in platform_list:
+        file_path = get_epg_file_name_today(platform)
+        if not os.path.exists(file_path):
+            continue
+
+        with open(file_path, "rb") as file:
+            xml_content = file.read()
+
+        try:
+            platform_root = ET.fromstring(xml_content)
+
+            # 处理channels
+            for channel in platform_root.findall("./channel"):
+                channel_id = channel.get("id")
+                if channel_id not in channels_seen:
+                    channels_seen.add(channel_id)
+                    merged_root.append(channel)
+
+                    # 同时添加该频道的所有节目
+                    for programme in platform_root.findall(f"./programme[@channel='{channel_id}']"):
+                        merged_root.append(programme)
+
+        except ET.ParseError as e:
+            print(f"Error parsing XML for platform {platform}: {e}")
+            continue
+
+    if len(list(merged_root)) == 0:
+        raise HTTPException(status_code=404, detail="No EPG data available")
+
+    # 将合并后的XML转换回字符串
+    merged_xml = ET.tostring(merged_root, encoding="utf-8", xml_declaration=True)
+    return Response(content=merged_xml, media_type="application/xml")
 
 
 async def gen_channel(channels, programs):
