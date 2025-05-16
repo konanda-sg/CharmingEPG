@@ -58,8 +58,9 @@ async def get_channels(force: bool = False):
         rawChannels = []
         rawPrograms = []
         for channel in data['channels']:
-            rawChannels.append({"channelName": channel['name_tc']})
-            programData = await request_epg(network_code=channel['network_code'], channel_name=channel['name_tc'])
+            channelName = channel['name_tc'].replace(" (免費)", "")
+            rawChannels.append({"channelName": channelName})
+            programData = await request_epg(network_code=channel['network_code'], channel_name=channelName)
             rawPrograms.extend(programData)
 
         return rawChannels, rawPrograms
