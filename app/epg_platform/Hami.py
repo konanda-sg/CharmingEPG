@@ -3,6 +3,7 @@ import asyncio
 import pytz
 import requests
 from datetime import datetime, timedelta
+from loguru import logger
 
 UA = "HamiVideo/7.12.806(Android 11;GM1910) OKHTTP/3.12.2"
 headers = {
@@ -46,13 +47,13 @@ async def get_programs_with_retry(channel):
             return programs
         except Exception as e:
             retries += 1
-            print(f"Error requesting EPG for {channel['channelName']}: {e}")
-            print(f"Retry {retries}/{max_retries} after 30 seconds...")
+            logger.error(f"Error requesting EPG for {channel['channelName']}: {e}")
+            logger.info(f"Retry {retries}/{max_retries} after 30 seconds...")
 
             if retries < max_retries:
                 await asyncio.sleep(30)  # 等待30秒再重试
             else:
-                print(f"Max retries reached for {channel['channelName']}, skipping...")
+                logger.info(f"Max retries reached for {channel['channelName']}, skipping...")
                 return []  # 达到最大重试次数后返回空列表
 
 
@@ -68,7 +69,7 @@ async def request_all_epg():
 
 async def request_epg(channel_name: str, content_pk: str):
     url = "https://apl-hamivideo.cdn.hinet.net/HamiVideo/getEpgByContentIdAndDate.php"
-    print("正在生成EPG：" + content_pk + "," + channel_name)
+    logger.info("正在生成EPG：" + content_pk + "," + channel_name)
     epgResult = []
     for i in range(7):
         date = datetime.now() + timedelta(days=i)
