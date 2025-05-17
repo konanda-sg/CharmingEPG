@@ -6,7 +6,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Response, HTTPException, Query
 
 from app.epg.EpgGenerator import generateEpg
-from app.epg_platform import MyTvSuper
+from app.epg_platform import MyTvSuper, Hami
+
 from loguru import logger
 import xml.etree.ElementTree as ET
 
@@ -54,6 +55,21 @@ async def request_my_tv_super_epg():
         print(f"今日mytvsuper epg已获取，不执行更新")
     # 删除旧的EPG
     delete_old_epg_file("tvb")
+
+
+async def request_hami_epg():
+    file_path = get_epg_file_name_today("hami")
+    mkdir_if_need(file_path)
+    if not os.path.exists(file_path):
+        channels, programs = await Hami.request_all_epg()
+        response_xml = await gen_channel(channels, programs)
+        # 使用 with 语句打开文件，确保文件在操作完成后被正确关闭
+        with open(file_path, "wb") as file:
+            file.write(response_xml)
+    else:
+        print(f"今日hami epg已获取，不执行更新")
+    # 删除旧的EPG
+    delete_old_epg_file("hami")
 
 
 async def request_now_tv_epg():
@@ -130,7 +146,7 @@ async def custom_aggregate_epg(platforms: str = Query(..., description="平台�
 
 @app.get("/all")
 async def aggregate_epg():
-    platform_list = ["tvb", "nowtv"]
+    platform_list = ["tvb", "nowtv", "hami"]
     return await checkout_epg_multiple(platform_list)  # 按优先级排序的平台列表
 
 
@@ -181,7 +197,8 @@ async def gen_channel(channels, programs):
 async def request_all_epg_job():
     tasks = [
         request_my_tv_super_epg(),
-        request_now_tv_epg()
+        request_now_tv_epg(),
+        request_hami_epg()
     ]
     # 使用 asyncio.gather 来并发执行请求
     for task in tasks:
