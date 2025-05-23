@@ -36,9 +36,10 @@ def get_official_channel_list():
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'Referer': 'https://nowplayer.now.com/channels',
         'User-Agent': UA,
+        'accept-language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ar-EG;q=0.6,ar;q=0.5'
     }
 
-    response = requests.get(url, headers=HEADER)
+    response = requests.get(url, headers=HEADER, cookies={'LANG': 'zh'})
 
     soup = BeautifulSoup(response.text, 'html.parser')
     channels = []
