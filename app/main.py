@@ -83,7 +83,7 @@ async def request_now_tv_epg():
     else:
         print(f"今日nowtv epg已获取，不执行更新")
     # 删除旧的EPG
-    delete_old_epg_file("tvb")
+    delete_old_epg_file("nowtv")
 
 
 def get_date_str():
