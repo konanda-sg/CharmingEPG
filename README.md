@@ -6,6 +6,11 @@
 - NowTV(需要配置NOWTV_CHANNEL_FILTER)
 - Hami
 
+## Feature
+- 获取多个平台的7天EPG，每天更新一次。
+- 每天生成的epg以xml存在本地。
+- 如需持久化epg文件，请挂载/code/epg_files目录。
+
 ## How to use
 
 ### Docker Compose
