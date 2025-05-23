@@ -11,7 +11,7 @@ import pytz
 
 load_dotenv(verbose=True, override=True)
 
-ChannelNoFilterTemp = os.getenv("CHANNEL_NO_FILTER", [])
+ChannelNoFilterTemp = os.getenv("NOWTV_CHANNEL_NO_FILTER", [])
 
 ChannelNoFilter = json.loads(ChannelNoFilterTemp)
 ChannelNoFilterStr = list(map(lambda x: str(x).zfill(3), ChannelNoFilter))
@@ -75,7 +75,7 @@ def time_stamp_to_timezone_str(timestamp_s):
 
 def get_local_channel_and_keys():
     current_file_path = os.path.dirname(__file__)
-    with open(f'{current_file_path}/channels.json', 'r', encoding='utf-8') as f:
+    with open(f'{current_file_path}/now_tv_channels.json', 'r', encoding='utf-8') as f:
         channels = json.load(f)
     return channels
 

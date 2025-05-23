@@ -22,10 +22,6 @@ if PROXY_HTTP and PROXY_HTTPS:
 
 
 async def get_channels(force: bool = False):
-    # isOver6h = await is_latest_program_by_platform_name_over_6h(platform_name)
-    # if not isOver6h and not force:
-    #     logger.info(f"平台【{platform_name}】 距离上次更新不足6小时，本次不执行更新。")
-    #     return
     logger.info(f"平台【{platform_name}】 正在执行更新")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
@@ -106,10 +102,6 @@ async def request_epg(network_code, channel_name):
         logger.info(response.url)
         data = response.json()
 
-        # await create_platform(platform_name)
-        # await create_channel(platform_name=platform_name, channel_name=channel_name)
-        # await delete_programs_by_channel(platform_name=platform_name, channel_name=channel_name)
-
         total_epg = []
 
         for day_data in data:
@@ -144,9 +136,6 @@ async def request_epg(network_code, channel_name):
                  "start": start_time_with_tz, "end": end_time_with_tz
                  }
             )
-            # await create_program(platform_name=platform_name, channel_name=channel_name, program_name=program_name,
-            #                      description=program_description, start_time=utc8_to_utc(start_time),
-            #                      end_time=utc8_to_utc(end_time))
 
         return epgResult
 

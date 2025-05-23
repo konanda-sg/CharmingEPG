@@ -13,9 +13,9 @@ import xml.etree.ElementTree as ET
 
 from app.epg_platform.NowTV import request_nowtv_today_epg
 
-logger.add("runtime.log")
+logger.add("runtime.log", rotation="10 MB")
 
-app = FastAPI(openapi_url=None, redoc_url=None)
+app = FastAPI(openapi_url=None)
 
 
 @app.get("/")
