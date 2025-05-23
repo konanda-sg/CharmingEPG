@@ -5,16 +5,13 @@ from datetime import datetime
 import requests
 from loguru import logger
 import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
 
 from dotenv import load_dotenv
 import pytz
 
 load_dotenv(verbose=True, override=True)
 
-ChannelNoFilterTemp = os.getenv("NOWTV_CHANNEL_NO_FILTER", [])
-
-ChannelNoFilter = json.loads(ChannelNoFilterTemp)
-ChannelNoFilterStr = list(map(lambda x: str(x).zfill(3), ChannelNoFilter))
 PROXY_HTTP = os.getenv("PROXY_HTTP", None)
 PROXY_HTTPS = os.getenv("PROXY_HTTPS", None)
 UA = os.getenv("UA",
@@ -28,9 +25,55 @@ if PROXY_HTTP and PROXY_HTTPS:
         "https": PROXY_HTTP
     }
 
+CHANNEL_LIST = []
+CHANNEL_NUMS = []
+
+
+def get_official_channel_list():
+    url = 'https://nowplayer.now.com/channels'
+    HEADER = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Referer': 'https://nowplayer.now.com/channels',
+        'User-Agent': UA,
+    }
+
+    response = requests.get(url, headers=HEADER)
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    channels = []
+
+    # 找到所有channel项
+    items = soup.find_all('div', class_='product-item')
+    channel_nums = []
+    for item in items:
+        # 获取logo图片URL
+        img_tag = item.find('img')
+        logo = img_tag['src'] if img_tag else None
+
+        # 获取频道名称
+        name_tag = item.find('p', class_='img-name')
+        name = name_tag.text if name_tag else None
+
+        # 获取频道号
+        channel_tag = item.find('p', class_='channel')
+        channel_no = channel_tag.text.replace('CH', '') if channel_tag else None
+
+        channels.append({
+            'logo': logo,
+            'name': name,
+            'channelNo': channel_no
+        })
+        channel_nums.append(channel_no)
+    CHANNEL_LIST.clear()
+    CHANNEL_LIST.extend(channels)
+    CHANNEL_NUMS.clear()
+    CHANNEL_NUMS.extend(channel_nums)
+
 
 async def request_nowtv_today_epg():
-    xml_str = await get_now_tv_guide_to_epg(ChannelNoFilterStr, "all")
+    get_official_channel_list()
+    xml_str = await get_now_tv_guide_to_epg(CHANNEL_NUMS, "all")
     return xml_str
 
 
@@ -39,7 +82,7 @@ async def get_now_tv_guide_to_epg(channel_numbers, cache_keyword):
     cache_key = f"{current_date}_{cache_keyword}"
 
     epg7Day = await fetch_7day_epg(channel_numbers)
-    channels = get_local_channel_and_keys()
+    channels = CHANNEL_LIST
     tv = ET.Element("tv", {"generator-info-name": "Charming"})
 
     for sportChannel in channel_numbers:
@@ -58,8 +101,7 @@ async def get_now_tv_guide_to_epg(channel_numbers, cache_keyword):
                 end_time = time_stamp_to_timezone_str(epgItem["end"] / 1000)
                 programme = ET.SubElement(tv, "programme", channel=channelName, start=start_time, stop=end_time)
                 title = ET.SubElement(programme, "title", lang="zh")
-                title.text = epgItem["name"]
-
+                title.text = epgItem.get("name", "")
     # 转换为字符串并格式化
     xml_str = ET.tostring(tv, encoding='utf-8')
     return xml_str
@@ -71,13 +113,6 @@ def time_stamp_to_timezone_str(timestamp_s):
     local_dt = utc_dt.astimezone(target_tz)
     formatted_time = local_dt.strftime('%Y%m%d%H%M%S %z')
     return formatted_time
-
-
-def get_local_channel_and_keys():
-    current_file_path = os.path.dirname(__file__)
-    with open(f'{current_file_path}/now_tv_channels.json', 'r', encoding='utf-8') as f:
-        channels = json.load(f)
-    return channels
 
 
 def find_channel_name(channels, channel_no):
