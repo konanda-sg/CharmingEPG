@@ -19,6 +19,14 @@ logger.add("runtime.log", rotation="10 MB")
 
 app = FastAPI(openapi_url=None)
 
+EPG_PLATFORMS = {
+    "cn": {"enabled": True, "fetcher": "request_cn_epg"},
+    "tvb": {"enabled": True, "fetcher": "request_my_tv_super_epg"},
+    "nowtv": {"enabled": True, "fetcher": "request_now_tv_epg"},
+    "hami": {"enabled": True, "fetcher": "request_hami_epg"},
+    "astro": {"enabled": True, "fetcher": "request_astro_epg"}
+}
+
 
 @app.get("/")
 async def root():
@@ -177,7 +185,7 @@ async def custom_aggregate_epg(platforms: str = Query(..., description="平台�
 
 @app.get("/all")
 async def aggregate_epg():
-    platform_list = ["cn", "tvb", "nowtv", "hami", "astro"]
+    platform_list = [p for p, conf in EPG_PLATFORMS.items() if conf["enabled"]]
     return await checkout_epg_multiple(platform_list)  # 按优先级排序的平台列表
 
 
@@ -226,20 +234,16 @@ async def gen_channel(channels, programs):
 
 
 async def request_all_epg_job():
-    tasks = [
-        request_cn_epg(),
-        request_my_tv_super_epg(),
-        request_now_tv_epg(),
-        request_astro_epg(),
-        request_hami_epg(),
-    ]
-    # 使用 asyncio.gather 来并发执行请求
+    tasks = []
+    for platform, conf in EPG_PLATFORMS.items():
+        if conf["enabled"]:
+            # 利用globals()动态获取函数对象
+            tasks.append(globals()[conf["fetcher"]]())
     for task in tasks:
         try:
             await task
         except Exception as e:
-            # 处理异常，记录错误日志或其他处理方式
-            logger.error(f"请求EPG时发生错误: {str(e)}")
+            logger.error(f"{platform} 请求EPG时发生错误: {str(e)}")
 
 
 @app.on_event("startup")
