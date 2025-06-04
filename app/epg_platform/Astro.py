@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from datetime import datetime, time, timezone, timedelta
 from zoneinfo import ZoneInfo
 import pytz
+from loguru import logger
 
 UA = "Mozilla/5.0"
 REFERER = "https://astrogo.astro.com.my/"
@@ -42,7 +43,6 @@ async def get_astro_epg():
     for day in range(0, 7):
         date_str, duration = get_date_str(day)
         raw_epg = query_epg(date_str, duration, channel_count, first_id)
-        print(raw_epg)
         if raw_epg.get("channels"):
             for channel in raw_epg["channels"]:
                 channel_id = channel["id"]
@@ -121,16 +121,16 @@ def get_access_token():
     session = requests.Session()
     response = session.get(url, headers=headers, allow_redirects=False, params=params)
     if "Location" not in response.headers:
-        print("未找到重定向Location!")
+        logger.error("未找到重定向Location!")
         return None
     location = response.headers["Location"]
     params = extract_fragment_params(location)
     access_token = params.get("access_token")
     if access_token:
-        print("access_token =", access_token)
+        logger.info("Astro access_token =", access_token)
         return access_token
     else:
-        print("未提取到access_token！完整location:", location)
+        logger.error("Astro 未提取到access_token！完整location:", location)
         return None
 
 
@@ -152,7 +152,6 @@ def get_date_str(date_delta):
         duration = 24
     target_time_utc = target_time.astimezone(timezone.utc)
     iso_str = target_time_utc.strftime('%Y-%m-%dT%H:%M:%S.000Z')
-    print(iso_str, duration)
     return iso_str, duration
 
 
