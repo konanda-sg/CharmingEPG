@@ -15,6 +15,20 @@
 
 ## How to use
 
+
+### 配置需要启用的平台
+
+```dotenv
+EPG_ENABLE_CN=true
+EPG_ENABLE_TVB=true
+EPG_ENABLE_NOWTV=false
+EPG_ENABLE_HAMI=true
+EPG_ENABLE_ASTRO=false
+```
+
+支持`1`/`0` `yes`/`no` `true`/`false` `on`/`off`
+这些配置已经在`docker-compose.example.yml`中列好，自行配置即可。
+
 ### Docker Compose
 
 ```bash
@@ -29,9 +43,15 @@ docker-compose build && docker-compose up -d
 ### Docker Cli
 
 ```bash
+# 自行配置平台开关
 docker run -d \
   -p 30008:80 \
   --name charming_epg \
+  -e EPG_ENABLE_CN=true \
+  -e EPG_ENABLE_TVB=true \
+  -e EPG_ENABLE_NOWTV=false \
+  -e EPG_ENABLE_HAMI=true \
+  -e EPG_ENABLE_ASTRO=false \
   $(docker build -q .)
 ```
 

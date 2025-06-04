@@ -19,13 +19,20 @@ logger.add("runtime.log", rotation="10 MB")
 
 app = FastAPI(openapi_url=None)
 
-EPG_PLATFORMS = {
-    "cn": {"enabled": True, "fetcher": "request_cn_epg"},
-    "tvb": {"enabled": True, "fetcher": "request_my_tv_super_epg"},
-    "nowtv": {"enabled": True, "fetcher": "request_now_tv_epg"},
-    "hami": {"enabled": True, "fetcher": "request_hami_epg"},
-    "astro": {"enabled": True, "fetcher": "request_astro_epg"}
-}
+EPG_PLATFORMS = [
+    {"platform": "cn", "fetcher": "request_cn_epg"},
+    {"platform": "tvb", "fetcher": "request_my_tv_super_epg"},
+    {"platform": "nowtv", "fetcher": "request_now_tv_epg"},
+    {"platform": "hami", "fetcher": "request_hami_epg"},
+    {"platform": "astro", "fetcher": "request_astro_epg"},
+]
+
+
+def platform_enabled(platform):
+    """判断 enable 环境变量"""
+    env_key = f"EPG_ENABLE_{platform.upper()}"
+    val = os.getenv(env_key, "true").strip().lower()
+    return val in {"1", "true", "yes", "on"}
 
 
 @app.get("/")
@@ -185,7 +192,12 @@ async def custom_aggregate_epg(platforms: str = Query(..., description="平台�
 
 @app.get("/all")
 async def aggregate_epg():
-    platform_list = [p for p, conf in EPG_PLATFORMS.items() if conf["enabled"]]
+    # 只聚合启用的
+    platform_list = [
+        conf["platform"]
+        for conf in EPG_PLATFORMS
+        if platform_enabled(conf["platform"])
+    ]
     return await checkout_epg_multiple(platform_list)  # 按优先级排序的平台列表
 
 
@@ -234,16 +246,16 @@ async def gen_channel(channels, programs):
 
 
 async def request_all_epg_job():
-    tasks = []
-    for platform, conf in EPG_PLATFORMS.items():
-        if conf["enabled"]:
-            # 利用globals()动态获取函数对象
-            tasks.append(globals()[conf["fetcher"]]())
+    tasks = [
+        globals()[conf["fetcher"]]()
+        for conf in EPG_PLATFORMS
+        if platform_enabled(conf["platform"])
+    ]
     for task in tasks:
         try:
             await task
         except Exception as e:
-            logger.error(f"{platform} 请求EPG时发生错误: {str(e)}")
+            logger.error(f"{task} 请求EPG时发生错误: {str(e)}")
 
 
 @app.on_event("startup")

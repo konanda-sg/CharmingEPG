@@ -4,3 +4,9 @@ services:
     build: .
     ports:
       - "30008:80"
+    environment:
+      - EPG_ENABLE_CN=true
+      - EPG_ENABLE_TVB=true
+      - EPG_ENABLE_NOWTV=false
+      - EPG_ENABLE_HAMI=true
+      - EPG_ENABLE_ASTRO=false
