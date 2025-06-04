@@ -46,5 +46,5 @@ http://[ip]:[port]/all
 #### 请求单个或多个平台
 
 ```
-http://[ip]:[port]/epg?platforms=tvb,nowtv,hami
+http://[ip]:[port]/epg?platforms=tvb,nowtv,hami,astro,cn
 ```
