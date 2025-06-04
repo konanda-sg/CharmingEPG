@@ -5,6 +5,8 @@
 - MyTV Super
 - NowTV
 - Hami
+- Astro Go（中文台都是中文描述）
+- CN (via epg.pw)
 
 ## Feature
 - 获取多个平台的7天EPG，每天更新一次。

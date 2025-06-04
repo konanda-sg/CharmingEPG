@@ -11,6 +11,8 @@ from app.epg_platform import MyTvSuper, Hami
 from loguru import logger
 import xml.etree.ElementTree as ET
 
+from app.epg_platform.Astro import get_astro_epg
+from app.epg_platform.CN_epg_pw import get_cn_channels_epg
 from app.epg_platform.NowTV import request_nowtv_today_epg
 
 logger.add("runtime.log", rotation="10 MB")
@@ -70,6 +72,35 @@ async def request_hami_epg():
         print(f"今日hami epg已获取，不执行更新")
     # 删除旧的EPG
     delete_old_epg_file("hami")
+
+
+async def request_cn_epg():
+    file_path = get_epg_file_name_today("cn")
+    mkdir_if_need(file_path)
+    if not os.path.exists(file_path):
+        response_xml = await get_cn_channels_epg()
+        # 使用 with 语句打开文件，确保文件在操作完成后被正确关闭
+        with open(file_path, "w") as file:
+            file.write(response_xml)
+    else:
+        print(f"今日cn epg已获取，不执行更新")
+    # 删除旧的EPG
+    delete_old_epg_file("cn")
+
+
+async def request_astro_epg():
+    file_path = get_epg_file_name_today("astro")
+    mkdir_if_need(file_path)
+    if not os.path.exists(file_path):
+        channels, programs = await get_astro_epg()
+        response_xml = await gen_channel(channels, programs)
+        # 使用 with 语句打开文件，确保文件在操作完成后被正确关闭
+        with open(file_path, "wb") as file:
+            file.write(response_xml)
+    else:
+        print(f"今日Astro epg已获取，不执行更新")
+    # 删除旧的EPG
+    delete_old_epg_file("astro")
 
 
 async def request_now_tv_epg():
@@ -146,7 +177,7 @@ async def custom_aggregate_epg(platforms: str = Query(..., description="平台�
 
 @app.get("/all")
 async def aggregate_epg():
-    platform_list = ["tvb", "nowtv", "hami"]
+    platform_list = ["cn", "tvb", "nowtv", "hami", "astro"]
     return await checkout_epg_multiple(platform_list)  # 按优先级排序的平台列表
 
 
@@ -196,9 +227,11 @@ async def gen_channel(channels, programs):
 
 async def request_all_epg_job():
     tasks = [
+        request_cn_epg(),
         request_my_tv_super_epg(),
         request_now_tv_epg(),
-        request_hami_epg()
+        request_astro_epg(),
+        request_hami_epg(),
     ]
     # 使用 asyncio.gather 来并发执行请求
     for task in tasks:
@@ -213,4 +246,4 @@ async def request_all_epg_job():
 async def startup():
     logger.info("定时任务启动")
     scheduler.start()
-    await request_all_epg_job()
+    asyncio.create_task(request_all_epg_job())
