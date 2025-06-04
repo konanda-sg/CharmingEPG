@@ -112,4 +112,4 @@ def hami_time_to_datetime(time_range: str):
     return start_time_shanghai, end_time_shanghai
 
 # if __name__ == '__main__':
-#     asyncio.run(request_epg("EUROSPORT","OTT_LIVE_0000001771"))  # Python 3.7+ 推荐方式
+#     asyncio.run(request_epg("EUROSPORT","OTT_LIVE_0000001771"))

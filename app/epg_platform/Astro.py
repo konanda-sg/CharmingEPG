@@ -41,6 +41,7 @@ async def get_astro_epg():
     channel_count, channels, first_id = query_channels()
     merged_channels = {}
     for day in range(0, 7):
+        logger.info("Astro 正在获取Day " + str(day))
         date_str, duration = get_date_str(day)
         raw_epg = query_epg(date_str, duration, channel_count, first_id)
         if raw_epg.get("channels"):
