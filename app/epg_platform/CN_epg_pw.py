@@ -1,7 +1,11 @@
 import requests
 import xml.etree.ElementTree as ET
 
+from loguru import logger
+
+
 async def get_cn_channels_epg():
+    logger.info("正在获取CN")
     url = 'https://epg.pw/xmltv/epg_CN.xml'
     response = requests.get(url)
     if response.status_code == 200:
