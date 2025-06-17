@@ -4,6 +4,7 @@
 
 - MyTV Super
 - NowTV
+- RTHK
 - Hami
 - Astro Go（中文台都是中文描述）
 - CN (via epg.pw)
@@ -24,6 +25,7 @@ EPG_ENABLE_TVB=true
 EPG_ENABLE_NOWTV=false
 EPG_ENABLE_HAMI=true
 EPG_ENABLE_ASTRO=false
+EPG_ENABLE_RTHK=false
 ```
 
 支持`1`/`0` `yes`/`no` `true`/`false` `on`/`off`
@@ -52,6 +54,7 @@ docker run -d \
   -e EPG_ENABLE_NOWTV=false \
   -e EPG_ENABLE_HAMI=true \
   -e EPG_ENABLE_ASTRO=false \
+  -e EPG_ENABLE_RTHK=false \
   $(docker build -q .)
 ```
 
