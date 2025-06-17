@@ -285,11 +285,14 @@ async def request_all_epg_job():
         for conf in EPG_PLATFORMS
         if platform_enabled(conf["platform"])
     ]
-    for task in tasks:
-        try:
-            await task
-        except Exception as e:
-            logger.error(f"{task} 请求EPG时发生错误: {str(e)}")
+    # 并行执行所有任务
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    # 处理可能的异常
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            # 获取函数名称更好地标识任务
+            task_name = EPG_PLATFORMS[i].get("fetcher", f"Task {i}")
+            logger.error(f"{task_name} 请求EPG时发生错误: {str(result)}")
 
 
 @app.on_event("startup")
