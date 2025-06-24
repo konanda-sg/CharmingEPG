@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 import pytz
 from loguru import logger
 
+from app.utils import has_chinese
+
 UA = "Mozilla/5.0"
 REFERER = "https://astrogo.astro.com.my/"
 C_TOKEN = "v:1!r:80800!ur:GUEST_REGION!community:Malaysia%20Live!t:k!dt:PC!f:Astro_unmanaged!pd:CHROME-FF!pt:Adults"
@@ -60,13 +62,21 @@ async def get_astro_epg():
         for program in merged_channels[channel]["schedule"]:
             start_time = program.get("startDateTime")
             duration = program.get("duration")
-            start_time_with_tz, end_time_with_tz = utc_to_local(start_time, duration)
-            epgResult.append(
-                {"channelName": channelName, "programName": program.get("title", ""),
-                 "description": program.get("synopsis", ""),
-                 "start": start_time_with_tz, "end": end_time_with_tz
-                 }
-            )
+            if start_time and duration:
+                start_time_with_tz, end_time_with_tz = utc_to_local(start_time, duration)
+                title = program.get("title", "")
+                description = program.get("synopsis", "")
+                episodeNumber = program.get("episodeNumber")
+                if has_chinese(title) or has_chinese(description):
+                    episodeNumber = f" 第{episodeNumber}集" if episodeNumber else ""
+                else:
+                    episodeNumber = f" Ep{episodeNumber}" if episodeNumber else ""
+                epgResult.append(
+                    {"channelName": channelName, "programName": title + episodeNumber,
+                     "description": description,
+                     "start": start_time_with_tz, "end": end_time_with_tz
+                     }
+                )
     return channels, epgResult
 
 
