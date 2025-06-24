@@ -193,7 +193,7 @@ def query_channels():
                 logo = channel["media"][0]["url"]
 
             channels.append(
-                {"channelName": channel["name"].replace(" HD", ""), "channelId": channel["id"], "logo": logo})
+                {"channelName": channel["name"].replace(" HD", "").strip(), "channelId": channel["id"], "logo": logo})
         return channel_count, channels, first_id
 
 
