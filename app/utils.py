@@ -7,5 +7,8 @@ def has_chinese(text):
     return bool(re.search(pattern, text))
 
 
-def remove_parentheses(text):
-    return re.sub(r'[（(][^）)]*[）)]', '', text)
+def remove_brackets(text):
+    pattern = r'[（(][^（()）]*[）)]'
+    while re.search(pattern, text):
+        text = re.sub(pattern, '', text)
+    return text.strip()
