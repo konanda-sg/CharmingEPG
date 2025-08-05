@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from loguru import logger
 
+from app.utils import remove_parentheses
+
 load_dotenv(verbose=True, override=True)
 PROXY_HTTP = os.getenv("PROXY_HTTP", None)
 PROXY_HTTPS = os.getenv("PROXY_HTTPS", None)
@@ -54,7 +56,7 @@ async def get_channels(force: bool = False):
         rawChannels = []
         rawPrograms = []
         for channel in data['channels']:
-            channelName = channel['name_tc'].replace(" (免費)", "")
+            channelName = remove_parentheses(channel['name_tc'])
             rawChannels.append({"channelName": channelName})
             programData = await request_epg(network_code=channel['network_code'], channel_name=channelName)
             rawPrograms.extend(programData)
