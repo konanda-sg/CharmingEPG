@@ -28,11 +28,11 @@ class AstroPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from Astro Go API"""
-        self.logger.info("Fetching channel list from Astro Go")
+        self.logger.info("📡 正在获取 Astro Go 频道列表")
 
         # Get access token first
         if not await self._get_access_token():
-            raise Exception("Failed to get Astro access token")
+            raise Exception("❌ 获取 Astro 访问令牌失败")
 
         headers = self.get_default_headers({
             "Referer": self.referer,
@@ -74,12 +74,12 @@ class AstroPlatform(BaseEPGPlatform):
                 raw_data=channel_data
             ))
 
-        self.logger.info(f"Found {len(channels)} channels from Astro Go")
+        self.logger.info(f"📺 发现 {len(channels)} 个 Astro Go 频道")
         return channels
 
     async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
         """Fetch program data for all channels"""
-        self.logger.info(f"Fetching program data for {len(channels)} channels")
+        self.logger.info(f"📡 正在抓取 {len(channels)} 个频道的节目数据")
 
         if not channels:
             return []
@@ -93,7 +93,7 @@ class AstroPlatform(BaseEPGPlatform):
 
         for day in range(7):
             try:
-                self.logger.debug(f"Fetching Astro EPG for day {day}")
+                self.logger.debug(f"🔍 正在获取第 {day} 天的 Astro EPG 数据")
                 date_str, duration = self._get_date_params(day)
 
                 raw_epg = await self._query_epg(date_str, duration, channel_count, first_id)
@@ -109,7 +109,7 @@ class AstroPlatform(BaseEPGPlatform):
                         merged_channels[channel_id].extend(schedule)
 
             except Exception as e:
-                self.logger.error(f"Failed to fetch EPG for day {day}: {e}")
+                self.logger.error(f"❌ 获取第 {day} 天的 EPG 数据失败: {e}")
                 continue
 
         # Convert to Program objects
@@ -148,10 +148,10 @@ class AstroPlatform(BaseEPGPlatform):
                         ))
 
                 except Exception as e:
-                    self.logger.warning(f"Failed to parse program data: {e}")
+                    self.logger.warning(f"⚠️ 解析节目数据失败: {e}")
                     continue
 
-        self.logger.info(f"Fetched {len(programs)} programs total")
+        self.logger.info(f"📊 总共抓取了 {len(programs)} 个节目")
         return programs
 
     async def _get_access_token(self) -> bool:
@@ -179,7 +179,7 @@ class AstroPlatform(BaseEPGPlatform):
 
             location = response.headers.get("Location")
             if not location:
-                self.logger.error("No Location header found in OAuth response")
+                self.logger.error("❌ OAuth 响应中未找到 Location 头")
                 return False
 
             # Extract access token from fragment
@@ -195,14 +195,14 @@ class AstroPlatform(BaseEPGPlatform):
             access_token = params.get("access_token")
             if access_token:
                 self.access_token = access_token
-                self.logger.debug(f"Astro access token obtained: {access_token[:20]}...")
+                self.logger.debug(f"✨ 获取 Astro 访问令牌成功: {access_token[:20]}...")
                 return True
             else:
-                self.logger.error(f"No access token in Location fragment: {location}")
+                self.logger.error(f"❌ Location 片段中未找到访问令牌: {location}")
                 return False
 
         except Exception as e:
-            self.logger.error(f"Failed to get Astro access token: {e}")
+            self.logger.error(f"❌ 获取 Astro 访问令牌失败: {e}")
             return False
 
     async def _query_epg(self, start_date: str, duration: int, channel_count: int, first_id: str) -> dict:
@@ -232,7 +232,7 @@ class AstroPlatform(BaseEPGPlatform):
         if response.status_code == 200:
             return response.json()
         else:
-            self.logger.warning(f"EPG query failed with status {response.status_code}")
+            self.logger.warning(f"⚠️ EPG 查询失败，状态码: {response.status_code}")
             return {}
 
     def _get_date_params(self, date_delta: int) -> tuple:
@@ -312,7 +312,7 @@ async def get_astro_epg():
         return raw_channels, raw_programs
 
     except Exception as e:
-        logger.error(f"Error in legacy get_astro_epg function: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 get_astro_epg 函数错误: {e}", exc_info=True)
         return [], []
 
 
@@ -343,16 +343,16 @@ def extract_fragment_params(location_url):
 
 def get_access_token():
     """Legacy utility function - synchronous version (limited functionality)"""
-    logger.warning("Legacy get_access_token called - use async version for better reliability")
+    logger.warning("⚠️ 调用了旧版 get_access_token - 请使用异步版本以获得更好的可靠性")
     try:
         import asyncio
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            logger.warning("Cannot run synchronous token fetch in async context")
+            logger.warning("⚠️ 在异步上下文中无法运行同步令牌获取")
             return None
         else:
             success = loop.run_until_complete(astro_platform._get_access_token())
             return astro_platform.access_token if success else None
     except Exception as e:
-        logger.error(f"Error in legacy get_access_token: {e}")
+        logger.error(f"❌ 旧版 get_access_token 错误: {e}")
         return None

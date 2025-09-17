@@ -46,77 +46,77 @@ scheduler = AsyncIOScheduler()
 @scheduler.scheduled_job('interval', minutes=Config.EPG_UPDATE_INTERVAL)
 async def scheduled_epg_update():
     """Scheduled task to update EPG data from all enabled platforms"""
-    logger.info(f"Starting scheduled EPG update at {datetime.now()}")
+    logger.info(f"🚀 开始定时更新EPG数据 - {datetime.now()}")
     await update_all_enabled_platforms()
 
 
 async def request_my_tv_super_epg():
     """Update MyTV Super EPG data"""
     platform = "tvb"
-    logger.info(f"Updating EPG for platform: {platform}")
+    logger.info(f"📺 正在更新平台EPG数据: {platform}")
 
     try:
         if EPGFileManager.read_epg_file(platform) is not None:
-            logger.info(f"Today's EPG already exists for {platform}, skipping update")
+            logger.info(f"✅ 今日{platform}的EPG数据已存在，跳过更新")
             return
 
         channels, programs = await MyTvSuper.get_channels(force=True)
         if not channels:
-            logger.warning(f"No channels found for {platform}")
+            logger.warning(f"⚠️ 未找到{platform}的频道数据")
             return
 
         response_xml = await gen_channel(channels, programs)
 
         if EPGFileManager.save_epg_file(platform, response_xml):
             EPGFileManager.delete_old_epg_files(platform)
-            logger.info(f"Successfully updated EPG for {platform}")
+            logger.info(f"✨ 成功更新{platform}的EPG数据")
         else:
-            logger.error(f"Failed to save EPG file for {platform}")
+            logger.error(f"❌ 保存{platform}的EPG文件失败")
 
     except Exception as e:
-        logger.error(f"Error updating EPG for {platform}: {e}", exc_info=True)
+        logger.error(f"💥 更新{platform}的EPG数据时发生错误: {e}", exc_info=True)
 
 
 async def request_hami_epg():
     """Update Hami EPG data"""
     platform = "hami"
-    logger.info(f"Updating EPG for platform: {platform}")
+    logger.info(f"📺 正在更新平台EPG数据: {platform}")
 
     try:
         if EPGFileManager.read_epg_file(platform) is not None:
-            logger.info(f"Today's EPG already exists for {platform}, skipping update")
+            logger.info(f"✅ 今日{platform}的EPG数据已存在，跳过更新")
             return
 
         channels, programs = await Hami.request_all_epg()
         if not channels:
-            logger.warning(f"No channels found for {platform}")
+            logger.warning(f"⚠️ 未找到{platform}的频道数据")
             return
 
         response_xml = await gen_channel(channels, programs)
 
         if EPGFileManager.save_epg_file(platform, response_xml):
             EPGFileManager.delete_old_epg_files(platform)
-            logger.info(f"Successfully updated EPG for {platform}")
+            logger.info(f"✨ 成功更新{platform}的EPG数据")
         else:
-            logger.error(f"Failed to save EPG file for {platform}")
+            logger.error(f"❌ 保存{platform}的EPG文件失败")
 
     except Exception as e:
-        logger.error(f"Error updating EPG for {platform}: {e}", exc_info=True)
+        logger.error(f"💥 更新{platform}的EPG数据时发生错误: {e}", exc_info=True)
 
 
 async def request_cn_epg():
     """Update CN (epg.pw) EPG data"""
     platform = "cn"
-    logger.info(f"Updating EPG for platform: {platform}")
+    logger.info(f"📺 正在更新平台EPG数据: {platform}")
 
     try:
         if EPGFileManager.read_epg_file(platform) is not None:
-            logger.info(f"Today's EPG already exists for {platform}, skipping update")
+            logger.info(f"✅ 今日{platform}的EPG数据已存在，跳过更新")
             return
 
         response_xml = await get_cn_channels_epg()
         if not response_xml:
-            logger.warning(f"No EPG data received for {platform}")
+            logger.warning(f"⚠️ 未收到{platform}的EPG数据")
             return
 
         # Convert string to bytes for consistent handling
@@ -124,151 +124,151 @@ async def request_cn_epg():
 
         if EPGFileManager.save_epg_file(platform, xml_bytes):
             EPGFileManager.delete_old_epg_files(platform)
-            logger.info(f"Successfully updated EPG for {platform}")
+            logger.info(f"✨ 成功更新{platform}的EPG数据")
         else:
-            logger.error(f"Failed to save EPG file for {platform}")
+            logger.error(f"❌ 保存{platform}的EPG文件失败")
 
     except Exception as e:
-        logger.error(f"Error updating EPG for {platform}: {e}", exc_info=True)
+        logger.error(f"💥 更新{platform}的EPG数据时发生错误: {e}", exc_info=True)
 
 
 async def request_astro_epg():
     """Update Astro Go EPG data"""
     platform = "astro"
-    logger.info(f"Updating EPG for platform: {platform}")
+    logger.info(f"📺 正在更新平台EPG数据: {platform}")
 
     try:
         if EPGFileManager.read_epg_file(platform) is not None:
-            logger.info(f"Today's EPG already exists for {platform}, skipping update")
+            logger.info(f"✅ 今日{platform}的EPG数据已存在，跳过更新")
             return
 
         channels, programs = await get_astro_epg()
         if not channels:
-            logger.warning(f"No channels found for {platform}")
+            logger.warning(f"⚠️ 未找到{platform}的频道数据")
             return
 
         response_xml = await gen_channel(channels, programs)
 
         if EPGFileManager.save_epg_file(platform, response_xml):
             EPGFileManager.delete_old_epg_files(platform)
-            logger.info(f"Successfully updated EPG for {platform}")
+            logger.info(f"✨ 成功更新{platform}的EPG数据")
         else:
-            logger.error(f"Failed to save EPG file for {platform}")
+            logger.error(f"❌ 保存{platform}的EPG文件失败")
 
     except Exception as e:
-        logger.error(f"Error updating EPG for {platform}: {e}", exc_info=True)
+        logger.error(f"💥 更新{platform}的EPG数据时发生错误: {e}", exc_info=True)
 
 
 async def request_rthk_epg():
     """Update RTHK EPG data"""
     platform = "rthk"
-    logger.info(f"Updating EPG for platform: {platform}")
+    logger.info(f"📺 正在更新平台EPG数据: {platform}")
 
     try:
         if EPGFileManager.read_epg_file(platform) is not None:
-            logger.info(f"Today's EPG already exists for {platform}, skipping update")
+            logger.info(f"✅ 今日{platform}的EPG数据已存在，跳过更新")
             return
 
         channels, programs = await get_rthk_epg()
         if not channels:
-            logger.warning(f"No channels found for {platform}")
+            logger.warning(f"⚠️ 未找到{platform}的频道数据")
             return
 
         response_xml = await gen_channel(channels, programs)
 
         if EPGFileManager.save_epg_file(platform, response_xml):
             EPGFileManager.delete_old_epg_files(platform)
-            logger.info(f"Successfully updated EPG for {platform}")
+            logger.info(f"✨ 成功更新{platform}的EPG数据")
         else:
-            logger.error(f"Failed to save EPG file for {platform}")
+            logger.error(f"❌ 保存{platform}的EPG文件失败")
 
     except Exception as e:
-        logger.error(f"Error updating EPG for {platform}: {e}", exc_info=True)
+        logger.error(f"💥 更新{platform}的EPG数据时发生错误: {e}", exc_info=True)
 
 
 async def request_hoy_epg():
     """Update HOY EPG data"""
     platform = "hoy"
-    logger.info(f"Updating EPG for platform: {platform}")
+    logger.info(f"📺 正在更新平台EPG数据: {platform}")
 
     try:
         if EPGFileManager.read_epg_file(platform) is not None:
-            logger.info(f"Today's EPG already exists for {platform}, skipping update")
+            logger.info(f"✅ 今日{platform}的EPG数据已存在，跳过更新")
             return
 
         channels, programs = await get_hoy_epg()
         if not channels:
-            logger.warning(f"No channels found for {platform}")
+            logger.warning(f"⚠️ 未找到{platform}的频道数据")
             return
 
         response_xml = await gen_channel(channels, programs)
 
         if EPGFileManager.save_epg_file(platform, response_xml):
             EPGFileManager.delete_old_epg_files(platform)
-            logger.info(f"Successfully updated EPG for {platform}")
+            logger.info(f"✨ 成功更新{platform}的EPG数据")
         else:
-            logger.error(f"Failed to save EPG file for {platform}")
+            logger.error(f"❌ 保存{platform}的EPG文件失败")
 
     except Exception as e:
-        logger.error(f"Error updating EPG for {platform}: {e}", exc_info=True)
+        logger.error(f"💥 更新{platform}的EPG数据时发生错误: {e}", exc_info=True)
 
 
 async def request_now_tv_epg():
     """Update NowTV EPG data"""
     platform = "nowtv"
-    logger.info(f"Updating EPG for platform: {platform}")
+    logger.info(f"📺 正在更新平台EPG数据: {platform}")
 
     try:
         if EPGFileManager.read_epg_file(platform) is not None:
-            logger.info(f"Today's EPG already exists for {platform}, skipping update")
+            logger.info(f"✅ 今日{platform}的EPG数据已存在，跳过更新")
             return
 
         response_xml = await request_nowtv_today_epg()
         if not response_xml:
-            logger.warning(f"No EPG data received for {platform}")
+            logger.warning(f"⚠️ 未收到{platform}的EPG数据")
             return
 
         if EPGFileManager.save_epg_file(platform, response_xml):
             EPGFileManager.delete_old_epg_files(platform)
-            logger.info(f"Successfully updated EPG for {platform}")
+            logger.info(f"✨ 成功更新{platform}的EPG数据")
         else:
-            logger.error(f"Failed to save EPG file for {platform}")
+            logger.error(f"❌ 保存{platform}的EPG文件失败")
 
     except Exception as e:
-        logger.error(f"Error updating EPG for {platform}: {e}", exc_info=True)
+        logger.error(f"💥 更新{platform}的EPG数据时发生错误: {e}", exc_info=True)
 
 
 async def request_starhub_epg():
     """Update StarHub EPG data"""
     platform = "starhub"
-    logger.info(f"Updating EPG for platform: {platform}")
+    logger.info(f"📺 正在更新平台EPG数据: {platform}")
 
     try:
         if EPGFileManager.read_epg_file(platform) is not None:
-            logger.info(f"Today's EPG already exists for {platform}, skipping update")
+            logger.info(f"✅ 今日{platform}的EPG数据已存在，跳过更新")
             return
 
         channels, programs = await get_starhub_epg()
         if not channels:
-            logger.warning(f"No channels found for {platform}")
+            logger.warning(f"⚠️ 未找到{platform}的频道数据")
             return
 
         response_xml = await gen_channel(channels, programs)
 
         if EPGFileManager.save_epg_file(platform, response_xml):
             EPGFileManager.delete_old_epg_files(platform)
-            logger.info(f"Successfully updated EPG for {platform}")
+            logger.info(f"✨ 成功更新{platform}的EPG数据")
         else:
-            logger.error(f"Failed to save EPG file for {platform}")
+            logger.error(f"❌ 保存{platform}的EPG文件失败")
 
     except Exception as e:
-        logger.error(f"Error updating EPG for {platform}: {e}", exc_info=True)
+        logger.error(f"💥 更新{platform}的EPG数据时发生错误: {e}", exc_info=True)
 
 
 @app.get("/epg/{platform}")
 async def get_platform_epg(platform: str):
     """Get EPG data for a specific platform"""
-    logger.info(f"Serving EPG data for platform: {platform}")
+    logger.info(f"📡 提供平台EPG数据服务: {platform}")
     return EPGFileManager.get_single_platform_epg(platform)
 
 
@@ -280,7 +280,7 @@ async def get_custom_aggregate_epg(platforms: str = Query(..., description="Comm
     Example: ?platforms=tvb,nowtv,hami
     """
     platform_list = [p.strip() for p in platforms.split(',') if p.strip()]
-    logger.info(f"Serving custom aggregated EPG for platforms: {platform_list}")
+    logger.info(f"📊 提供自定义聚合EPG数据服务: {platform_list}")
     return EPGFileManager.aggregate_epg_files(platform_list)
 
 
@@ -288,7 +288,7 @@ async def get_custom_aggregate_epg(platforms: str = Query(..., description="Comm
 async def get_all_enabled_platforms_epg():
     """Get aggregated EPG data from all enabled platforms"""
     enabled_platforms = [p["platform"] for p in Config.get_enabled_platforms()]
-    logger.info(f"Serving aggregated EPG for all enabled platforms: {enabled_platforms}")
+    logger.info(f"🌐 提供所有启用平台的聚合EPG数据服务: {enabled_platforms}")
     return EPGFileManager.aggregate_epg_files(enabled_platforms)
 
 
@@ -303,10 +303,10 @@ async def update_all_enabled_platforms():
     enabled_platforms = Config.get_enabled_platforms()
 
     if not enabled_platforms:
-        logger.warning("No platforms are enabled")
+        logger.warning("⚠️ 没有启用任何平台")
         return
 
-    logger.info(f"Starting EPG update for {len(enabled_platforms)} enabled platforms")
+    logger.info(f"🔄 开始更新{len(enabled_platforms)}个启用平台的EPG数据")
 
     tasks = [
         globals()[conf["fetcher"]]()
@@ -326,27 +326,27 @@ async def update_all_enabled_platforms():
 
         if isinstance(result, Exception):
             error_count += 1
-            logger.error(f"Failed to update EPG for {platform_name}: {result}", exc_info=True)
+            logger.error(f"❌ 更新{platform_name}的EPG数据失败: {result}", exc_info=True)
         else:
             success_count += 1
-            logger.debug(f"Successfully updated EPG for {platform_name}")
+            logger.debug(f"✅ 成功更新{platform_name}的EPG数据")
 
-    logger.info(f"EPG update completed: {success_count} successful, {error_count} failed")
+    logger.info(f"🎯 EPG数据更新完成: {success_count}个成功，{error_count}个失败")
 
 
 @app.on_event("startup")
 async def startup():
     """Application startup event"""
-    logger.info(f"Starting {Config.APP_NAME} v{Config.APP_VERSION}")
-    logger.info(f"EPG update interval: {Config.EPG_UPDATE_INTERVAL} minutes")
+    logger.info(f"🚀 启动 {Config.APP_NAME} v{Config.APP_VERSION}")
+    logger.info(f"⏰ EPG更新间隔: {Config.EPG_UPDATE_INTERVAL} 分钟")
 
     enabled_platforms = [p["name"] for p in Config.get_enabled_platforms()]
-    logger.info(f"Enabled platforms: {', '.join(enabled_platforms)}")
+    logger.info(f"📺 已启用平台: {', '.join(enabled_platforms)}")
 
     # Start the scheduler
     scheduler.start()
-    logger.info("Scheduler started")
+    logger.info("⚡ 调度器已启动")
 
     # Trigger initial EPG update
     asyncio.create_task(update_all_enabled_platforms())
-    logger.info("Initial EPG update triggered")
+    logger.info("🎬 初始EPG数据更新已触发")

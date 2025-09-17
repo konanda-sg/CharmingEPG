@@ -27,7 +27,7 @@ class RTHKPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from RTHK (predefined channels)"""
-        self.logger.info("Creating RTHK channel list")
+        self.logger.info("📺 正在创建 RTHK 频道列表")
 
         channels = []
         for channel_def in self.channel_definitions:
@@ -37,12 +37,12 @@ class RTHKPlatform(BaseEPGPlatform):
                 raw_data=channel_def
             ))
 
-        self.logger.info(f"Found {len(channels)} RTHK channels")
+        self.logger.info(f"📺 发现 {len(channels)} 个 RTHK 频道")
         return channels
 
     async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
         """Fetch program data for all RTHK channels"""
-        self.logger.info(f"Fetching program data for {len(channels)} RTHK channels")
+        self.logger.info(f"📡 正在抓取 {len(channels)} 个 RTHK 频道的节目数据")
 
         all_programs = []
 
@@ -51,15 +51,15 @@ class RTHKPlatform(BaseEPGPlatform):
                 programs = await self._fetch_channel_programs(channel)
                 all_programs.extend(programs)
             except Exception as e:
-                self.logger.error(f"Failed to fetch programs for {channel.name}: {e}")
+                self.logger.error(f"❌ 获取频道 {channel.name} 节目数据失败: {e}")
                 continue
 
-        self.logger.info(f"Fetched {len(all_programs)} programs total")
+        self.logger.info(f"📊 总共抓取了 {len(all_programs)} 个节目")
         return all_programs
 
     async def _fetch_channel_programs(self, channel: Channel) -> List[Program]:
         """Fetch program data for a specific RTHK channel"""
-        self.logger.debug(f"Fetching programs for channel: {channel.name}")
+        self.logger.debug(f"🔍 正在获取频道节目: {channel.name}")
 
         url = f"{self.base_url}/{channel.channel_id}"
 
@@ -67,7 +67,7 @@ class RTHKPlatform(BaseEPGPlatform):
 
         programs = self._parse_epg_from_html(response.text, channel)
 
-        self.logger.debug(f"Found {len(programs)} programs for {channel.name}")
+        self.logger.debug(f"📺 在 {channel.name} 中发现 {len(programs)} 个节目")
         return programs
 
     def _parse_epg_from_html(self, html_content: str, channel: Channel) -> List[Program]:
@@ -101,11 +101,11 @@ class RTHKPlatform(BaseEPGPlatform):
                             if program:
                                 programs.append(program)
                         except Exception as e:
-                            self.logger.warning(f"Failed to parse program block: {e}")
+                            self.logger.warning(f"⚠️ 解析节目块失败: {e}")
                             continue
 
                 except Exception as e:
-                    self.logger.warning(f"Failed to parse date block for {date_str}: {e}")
+                    self.logger.warning(f"⚠️ 解析日期块 {date_str} 失败: {e}")
                     continue
 
         return programs
@@ -210,7 +210,7 @@ def parse_epg_from_html(html_content, channel_name):
 
         return results
     except Exception as e:
-        logger.error(f"Error in legacy parse_epg_from_html: {e}")
+        logger.error(f"❌ 旧版 parse_epg_from_html 错误: {e}")
         return []
 
 
@@ -243,5 +243,5 @@ async def get_rthk_epg():
         return raw_channels, raw_programs
 
     except Exception as e:
-        logger.error(f"Error in legacy get_rthk_epg function: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 get_rthk_epg 函数错误: {e}", exc_info=True)
         return [], []

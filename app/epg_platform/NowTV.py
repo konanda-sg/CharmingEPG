@@ -23,7 +23,7 @@ class NowTVPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from NowTV website"""
-        self.logger.info("Fetching channel list from NowTV")
+        self.logger.info("📡 正在从 NowTV 获取频道列表")
 
         headers = self.get_default_headers({
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -77,18 +77,18 @@ class NowTVPlatform(BaseEPGPlatform):
         self.channels_cache = channels
         self.channel_nums_cache = channel_nums
 
-        self.logger.info(f"Found {len(channels)} channels from NowTV")
+        self.logger.info(f"📺 从 NowTV 发现 {len(channels)} 个频道")
         return channels
 
     async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
         """Fetch program data for all channels"""
-        self.logger.info(f"Fetching program data for {len(channels)} channels")
+        self.logger.info(f"📡 正在抓取 {len(channels)} 个频道的节目数据")
 
         # Get channel numbers for EPG fetching
         channel_numbers = [ch.extra_data.get('channelNo') for ch in channels if ch.extra_data.get('channelNo')]
 
         if not channel_numbers:
-            self.logger.warning("No channel numbers found for EPG fetching")
+            self.logger.warning("⚠️ 未找到用于 EPG 抓取的频道编号")
             return []
 
         # Fetch 7-day EPG data
@@ -122,10 +122,10 @@ class NowTVPlatform(BaseEPGPlatform):
                             ))
 
                         except Exception as e:
-                            self.logger.warning(f"Failed to parse program data: {e}")
+                            self.logger.warning(f"⚠️ 解析节目数据失败: {e}")
                             continue
 
-        self.logger.info(f"Fetched {len(programs)} programs total")
+        self.logger.info(f"📊 总共抓取了 {len(programs)} 个节目")
         return programs
 
     async def _fetch_7day_epg(self, channel_numbers: List[str]) -> dict:
@@ -155,16 +155,16 @@ class NowTVPlatform(BaseEPGPlatform):
                     params=params
                 )
 
-                self.logger.debug(f"EPG request for day {day}: status {response.status_code}")
+                self.logger.debug(f"🔍 第 {day} 天的 EPG 请求: 状态码 {response.status_code}")
 
                 if response.status_code == 200:
                     epg_cache[day] = response.json()
                 else:
-                    self.logger.warning(f"Failed to fetch EPG for day {day}: status {response.status_code}")
+                    self.logger.warning(f"⚠️ 获取第 {day} 天的 EPG 失败: 状态码 {response.status_code}")
                     epg_cache[day] = []
 
             except Exception as e:
-                self.logger.error(f"Error fetching EPG for day {day}: {e}")
+                self.logger.error(f"❌ 获取第 {day} 天的 EPG 错误: {e}")
                 epg_cache[day] = []
 
         return epg_cache
@@ -225,7 +225,7 @@ class NowTVPlatform(BaseEPGPlatform):
                             title.text = epg_item.get("name", "")
 
                         except Exception as e:
-                            self.logger.warning(f"Failed to create programme element: {e}")
+                            self.logger.warning(f"⚠️ 创建节目元素失败: {e}")
                             continue
 
         return ET.tostring(tv, encoding='utf-8')
@@ -251,7 +251,7 @@ def get_official_channel_list():
         if loop.is_running():
             # If we're already in an async context, we can't use run()
             # This is a limitation of the legacy sync function
-            logger.warning("get_official_channel_list called from async context - returning empty list")
+            logger.warning("⚠️ 在异步上下文中调用 get_official_channel_list - 返回空列表")
             return []
         else:
             channels = loop.run_until_complete(nowtv_platform.fetch_channels())
@@ -259,7 +259,7 @@ def get_official_channel_list():
             nowtv_platform.channel_nums_cache = [ch.extra_data.get('channelNo') for ch in channels]
             return [ch.extra_data for ch in channels]
     except Exception as e:
-        logger.error(f"Error in legacy get_official_channel_list: {e}")
+        logger.error(f"❌ 旧版 get_official_channel_list 错误: {e}")
         return []
 
 
@@ -271,7 +271,7 @@ async def request_nowtv_today_epg():
         xml_bytes = await nowtv_platform.generate_epg_xml_direct(channel_numbers)
         return xml_bytes
     except Exception as e:
-        logger.error(f"Error in legacy request_nowtv_today_epg: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 request_nowtv_today_epg 错误: {e}", exc_info=True)
         return b""
 
 
@@ -281,7 +281,7 @@ async def get_now_tv_guide_to_epg(channel_numbers, cache_keyword):
         xml_bytes = await nowtv_platform.generate_epg_xml_direct(channel_numbers)
         return xml_bytes
     except Exception as e:
-        logger.error(f"Error in legacy get_now_tv_guide_to_epg: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 get_now_tv_guide_to_epg 错误: {e}", exc_info=True)
         return b""
 
 
@@ -303,5 +303,5 @@ async def fetch_7day_epg(channel_numbers):
     try:
         return await nowtv_platform._fetch_7day_epg(channel_numbers)
     except Exception as e:
-        logger.error(f"Error in legacy fetch_7day_epg: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 fetch_7day_epg 错误: {e}", exc_info=True)
         return {}

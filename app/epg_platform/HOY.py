@@ -18,7 +18,7 @@ class HOYPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from HOY TV API"""
-        self.logger.info("Fetching channel list from HOY TV")
+        self.logger.info("📡 正在从 HOY TV 获取频道列表")
 
         response = self.http_client.get(self.channel_list_url)
         data = response.json()
@@ -42,12 +42,12 @@ class HOYPlatform(BaseEPGPlatform):
                         raw_data=raw_channel
                     ))
 
-        self.logger.info(f"Found {len(channels)} channels from HOY TV")
+        self.logger.info(f"📺 从 HOY TV 发现 {len(channels)} 个频道")
         return channels
 
     async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
         """Fetch program data for all HOY TV channels"""
-        self.logger.info(f"Fetching program data for {len(channels)} HOY TV channels")
+        self.logger.info(f"📡 正在抓取 {len(channels)} 个 HOY TV 频道的节目数据")
 
         all_programs = []
 
@@ -56,26 +56,26 @@ class HOYPlatform(BaseEPGPlatform):
                 programs = await self._fetch_channel_programs(channel)
                 all_programs.extend(programs)
             except Exception as e:
-                self.logger.error(f"Failed to fetch programs for {channel.name}: {e}")
+                self.logger.error(f"❌ 获取频道 {channel.name} 节目数据失败: {e}")
                 continue
 
-        self.logger.info(f"Fetched {len(all_programs)} programs total")
+        self.logger.info(f"📊 总共抓取了 {len(all_programs)} 个节目")
         return all_programs
 
     async def _fetch_channel_programs(self, channel: Channel) -> List[Program]:
         """Fetch program data for a specific HOY TV channel"""
-        self.logger.debug(f"Fetching programs for channel: {channel.name}")
+        self.logger.debug(f"🔍 正在获取频道节目: {channel.name}")
 
         epg_url = channel.extra_data.get('epg_url')
         if not epg_url:
-            self.logger.warning(f"No EPG URL found for channel {channel.name}")
+            self.logger.warning(f"⚠️ 频道 {channel.name} 未找到 EPG URL")
             return []
 
         response = self.http_client.get(epg_url)
 
         programs = self._parse_epg_xml(response.text, channel)
 
-        self.logger.debug(f"Found {len(programs)} programs for {channel.name}")
+        self.logger.debug(f"📺 在 {channel.name} 中发现 {len(programs)} 个节目")
         return programs
 
     def _parse_epg_xml(self, xml_content: str, channel: Channel) -> List[Program]:
@@ -83,7 +83,7 @@ class HOYPlatform(BaseEPGPlatform):
         try:
             root = ET.fromstring(xml_content)
         except ET.ParseError as e:
-            self.logger.error(f"Failed to parse XML for {channel.name}: {e}")
+            self.logger.error(f"❌ 解析 {channel.name} 的 XML 失败: {e}")
             return []
 
         programs = []
@@ -138,7 +138,7 @@ class HOYPlatform(BaseEPGPlatform):
                             ))
 
                 except Exception as e:
-                    self.logger.warning(f"Failed to parse EPG item: {e}")
+                    self.logger.warning(f"⚠️ 解析 EPG 项目失败: {e}")
                     continue
 
         return programs
@@ -169,7 +169,7 @@ def parse_epg_xml(xml_content, channel_name):
 
         return results
     except Exception as e:
-        logger.error(f"Error in legacy parse_epg_xml: {e}")
+        logger.error(f"❌ 旧版 parse_epg_xml 错误: {e}")
         return []
 
 
@@ -189,7 +189,7 @@ async def get_hoy_lists():
 
         return channel_list
     except Exception as e:
-        logger.error(f"Error in legacy get_hoy_lists: {e}")
+        logger.error(f"❌ 旧版 get_hoy_lists 错误: {e}")
         return []
 
 
@@ -223,5 +223,5 @@ async def get_hoy_epg():
         return raw_channels, raw_programs
 
     except Exception as e:
-        logger.error(f"Error in legacy get_hoy_epg function: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 get_hoy_epg 函数错误: {e}", exc_info=True)
         return [], []

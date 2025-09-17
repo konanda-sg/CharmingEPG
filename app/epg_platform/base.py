@@ -70,11 +70,11 @@ class BaseEPGPlatform(ABC):
         directory = os.path.dirname(file_path)
         if not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
-            self.logger.info(f"Created directory: {directory}")
+            self.logger.info(f"📌 创建目录: {directory}")
 
     async def generate_epg_xml(self, channels: List[Channel], programs: List[Program]) -> bytes:
         """Generate EPG XML from channels and programs data"""
-        self.logger.info(f"Generating EPG XML for {len(channels)} channels and {len(programs)} programs")
+        self.logger.info(f"🛠️ 正在生成EPG XML：{len(channels)}个频道，{len(programs)}个节目")
         return await generateEpg(channels, programs)
 
     async def save_epg_to_file(self, xml_content: bytes, file_path: str):
@@ -85,7 +85,7 @@ class BaseEPGPlatform(ABC):
             file.write(xml_content)
 
         file_size = len(xml_content)
-        self.logger.info(f"Saved EPG to {file_path} ({file_size} bytes)")
+        self.logger.info(f"💾 保存EPG数据到 {file_path} ({file_size} 字节)")
 
     def _delete_old_epg_files(self):
         """Delete old EPG files, keeping only today's file"""
@@ -102,13 +102,13 @@ class BaseEPGPlatform(ABC):
                     file_path = os.path.join(epg_dir, file_name)
                     os.remove(file_path)
                     deleted_count += 1
-                    self.logger.debug(f"Deleted old EPG file: {file_name}")
+                    self.logger.debug(f"🗑️ 删除旧EPG文件: {file_name}")
 
             if deleted_count > 0:
-                self.logger.info(f"Cleaned up {deleted_count} old EPG files for {self.platform_name}")
+                self.logger.info(f"🧹 清理{self.platform_name}的{deleted_count}个旧EPG文件")
 
         except Exception as e:
-            self.logger.error(f"Failed to delete old EPG files for {self.platform_name}: {e}")
+            self.logger.error(f"❌ 删除{self.platform_name}的旧EPG文件失败: {e}")
 
     async def update_epg(self, force: bool = False) -> bool:
         """
@@ -124,21 +124,21 @@ class BaseEPGPlatform(ABC):
 
         # Check if today's EPG already exists
         if not force and os.path.exists(file_path):
-            self.logger.info(f"Today's EPG already exists for {self.platform_name}, skipping update")
+            self.logger.info(f"✅ {self.platform_name}的今日EPG数据已存在，跳过更新")
             return True
 
         try:
-            self.logger.info(f"Starting EPG update for platform: {self.platform_name}")
+            self.logger.info(f"🚀 开始EPG更新：{self.platform_name}")
 
             # Fetch data
             channels = await self.fetch_channels()
             if not channels:
-                self.logger.warning(f"No channels found for {self.platform_name}")
+                self.logger.warning(f"⚠️ {self.platform_name}未找到频道数据")
                 return False
 
             programs = await self.fetch_programs(channels)
             if not programs:
-                self.logger.warning(f"No programs found for {self.platform_name}")
+                self.logger.warning(f"⚠️ {self.platform_name}未找到节目数据")
                 return False
 
             # Generate XML
@@ -150,11 +150,11 @@ class BaseEPGPlatform(ABC):
             # Clean up old files
             self._delete_old_epg_files()
 
-            self.logger.info(f"Successfully updated EPG for {self.platform_name}")
+            self.logger.info(f"✨ 成功更新{self.platform_name}的EPG数据")
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to update EPG for {self.platform_name}: {e}", exc_info=True)
+            self.logger.error(f"❌ 更新{self.platform_name}的EPG数据失败: {e}", exc_info=True)
             return False
 
     def get_default_headers(self, additional_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:

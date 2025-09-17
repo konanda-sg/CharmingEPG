@@ -20,7 +20,7 @@ class MyTvSuperPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from MyTV Super API"""
-        self.logger.info("Fetching channel list from MyTV Super")
+        self.logger.info("📺 正在从 MyTV Super 获取频道列表")
 
         headers = self.get_default_headers({
             "Origin": "https://www.mytvsuper.com",
@@ -58,12 +58,12 @@ class MyTvSuperPlatform(BaseEPGPlatform):
                     raw_data=channel_data
                 ))
 
-        self.logger.info(f"Found {len(channels)} channels from MyTV Super")
+        self.logger.info(f"🎆 从 MyTV Super 发现 {len(channels)} 个频道")
         return channels
 
     async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
         """Fetch program data for all channels"""
-        self.logger.info(f"Fetching program data for {len(channels)} channels")
+        self.logger.info(f"📡 正在获取 {len(channels)} 个频道的节目数据")
 
         all_programs = []
         for channel in channels:
@@ -74,15 +74,15 @@ class MyTvSuperPlatform(BaseEPGPlatform):
                 )
                 all_programs.extend(programs)
             except Exception as e:
-                self.logger.error(f"Failed to fetch programs for channel {channel.name}: {e}")
+                self.logger.error(f"❌ 获取频道 {channel.name} 的节目数据失败: {e}")
                 continue
 
-        self.logger.info(f"Fetched {len(all_programs)} programs total")
+        self.logger.info(f"📊 共获取 {len(all_programs)} 个节目")
         return all_programs
 
     async def _fetch_channel_programs(self, network_code: str, channel_name: str) -> List[Program]:
         """Fetch program data for a specific channel"""
-        self.logger.debug(f"Fetching programs for channel: {channel_name}")
+        self.logger.debug(f"🔍 正在获取频道节目: {channel_name}")
 
         # Get date range (today + 7 days)
         start_date = datetime.now().strftime('%Y%m%d')
@@ -154,10 +154,10 @@ class MyTvSuperPlatform(BaseEPGPlatform):
                 ))
 
             except Exception as e:
-                self.logger.warning(f"Failed to parse program data: {e}")
+                self.logger.warning(f"⚠️ 解析节目数据失败: {e}")
                 continue
 
-        self.logger.debug(f"Found {len(programs)} programs for {channel_name}")
+        self.logger.debug(f"🎯 为 {channel_name} 找到 {len(programs)} 个节目")
         return programs
 
 
@@ -188,7 +188,7 @@ async def get_channels(force: bool = False):
         return raw_channels, raw_programs
 
     except Exception as e:
-        logger.error(f"Error in legacy get_channels function: {e}", exc_info=True)
+        logger.error(f"💥 旧版 get_channels 函数错误: {e}", exc_info=True)
         return [], []
 
 

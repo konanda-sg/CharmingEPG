@@ -27,7 +27,7 @@ class EPGFileManager:
         directory = os.path.dirname(file_path)
         if not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
-            logger.info(f"Created directory: {directory}")
+            logger.info(f"📌 创建目录: {directory}")
 
     @staticmethod
     def read_epg_file(platform: str, date_str: str = None) -> Optional[bytes]:
@@ -44,16 +44,16 @@ class EPGFileManager:
         file_path = EPGFileManager.get_epg_file_path(platform, date_str)
 
         if not os.path.exists(file_path):
-            logger.warning(f"EPG file not found: {file_path}")
+            logger.warning(f"⚠️ EPG文件未找到: {file_path}")
             return None
 
         try:
             with open(file_path, "rb") as file:
                 content = file.read()
-                logger.debug(f"Successfully read EPG file: {file_path} ({len(content)} bytes)")
+                logger.debug(f"✅ 成功读取EPG文件: {file_path} ({len(content)} 字节)")
                 return content
         except Exception as e:
-            logger.error(f"Failed to read EPG file {file_path}: {e}")
+            logger.error(f"❌ 读取EPG文件失败 {file_path}: {e}")
             return None
 
     @staticmethod
@@ -77,11 +77,11 @@ class EPGFileManager:
             with open(file_path, "wb") as file:
                 file.write(content)
 
-            logger.info(f"Saved EPG file: {file_path} ({len(content)} bytes)")
+            logger.info(f"💾 保存EPG文件: {file_path} ({len(content)} 字节)")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to save EPG file {file_path}: {e}")
+            logger.error(f"❌ 保存EPG文件失败 {file_path}: {e}")
             return False
 
     @staticmethod
@@ -111,15 +111,15 @@ class EPGFileManager:
                         file_path = os.path.join(epg_dir, file_name)
                         os.remove(file_path)
                         deleted_count += 1
-                        logger.debug(f"Deleted old EPG file: {file_name}")
+                        logger.debug(f"🗑️ 删除旧EPG文件: {file_name}")
 
             if deleted_count > 0:
-                logger.info(f"Cleaned up {deleted_count} old EPG files for {platform}")
+                logger.info(f"🧹 清理{platform}的{deleted_count}个旧EPG文件")
 
             return deleted_count
 
         except Exception as e:
-            logger.error(f"Failed to delete old EPG files for {platform}: {e}")
+            logger.error(f"❌ 删除{platform}的旧EPG文件失败: {e}")
             return 0
 
     @staticmethod
@@ -136,7 +136,7 @@ class EPGFileManager:
         Raises:
             HTTPException: If no EPG data is available
         """
-        logger.info(f"Aggregating EPG data for platforms: {platforms}")
+        logger.info(f"🔄 正在聚合平台EPG数据: {platforms}")
 
         merged_root = ET.Element("tv")
         merged_root.set("generator-info-name", f"{Config.APP_NAME} v{Config.APP_VERSION}")
@@ -149,7 +149,7 @@ class EPGFileManager:
         for platform in platforms:
             content = EPGFileManager.read_epg_file(platform)
             if not content:
-                logger.warning(f"No EPG data found for platform: {platform}")
+                logger.warning(f"⚠️ 未找到平台的EPG数据: {platform}")
                 continue
 
             try:
@@ -175,21 +175,21 @@ class EPGFileManager:
                 total_programs += platform_programs
 
                 logger.debug(
-                    f"Merged {platform_channels} channels and {platform_programs} programs from {platform}"
+                    f"🔀 从{platform}合并{platform_channels}个频道和{platform_programs}个节目"
                 )
 
             except ET.ParseError as e:
-                logger.error(f"Failed to parse XML for platform {platform}: {e}")
+                logger.error(f"❌ 解析平台{platform}的XML失败: {e}")
                 continue
 
         if total_channels == 0:
-            logger.error("No valid EPG data found in any platform")
+            logger.error("❌ 任何平台都未找到有效的EPG数据")
             raise HTTPException(status_code=404, detail="No EPG data available")
 
         # Convert merged XML to string
         merged_xml = ET.tostring(merged_root, encoding="utf-8", xml_declaration=True)
 
-        logger.info(f"Successfully aggregated {total_channels} channels and {total_programs} programs")
+        logger.info(f"✨ 成功聚合{total_channels}个频道和{total_programs}个节目")
 
         return Response(
             content=merged_xml,
@@ -219,7 +219,7 @@ class EPGFileManager:
         content = EPGFileManager.read_epg_file(platform)
 
         if content is None:
-            logger.error(f"EPG file not found for platform: {platform}")
+            logger.error(f"❌ 未找到平台{platform}的EPG文件")
             raise HTTPException(
                 status_code=404,
                 detail=f"EPG data not available for platform: {platform}"
@@ -231,7 +231,7 @@ class EPGFileManager:
             channel_count = len(root.findall("./channel"))
             program_count = len(root.findall("./programme"))
 
-            logger.info(f"Serving EPG for {platform}: {channel_count} channels, {program_count} programs")
+            logger.info(f"📡 为{platform}提供EPG服务: {channel_count}个频道，{program_count}个节目")
 
             return Response(
                 content=content,
@@ -245,7 +245,7 @@ class EPGFileManager:
             )
 
         except ET.ParseError:
-            logger.warning(f"Invalid XML content for platform {platform}, serving as-is")
+            logger.warning(f"⚠️ 平台{platform}的XML内容无效，按原样提供服务")
             return Response(
                 content=content,
                 media_type="application/xml",

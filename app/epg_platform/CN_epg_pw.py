@@ -16,7 +16,7 @@ class CNEpgPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from CN EPG XML"""
-        self.logger.info("Fetching channel list from CN EPG")
+        self.logger.info("📡 正在从 CN EPG 获取频道列表")
 
         response = self.http_client.get(self.epg_url)
 
@@ -36,12 +36,12 @@ class CNEpgPlatform(BaseEPGPlatform):
                     raw_data={'xml_element': channel_elem}
                 ))
 
-        self.logger.info(f"Found {len(channels)} channels from CN EPG")
+        self.logger.info(f"📺 从 CN EPG 发现 {len(channels)} 个频道")
         return channels
 
     async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
         """Fetch program data from CN EPG XML"""
-        self.logger.info(f"Fetching program data for {len(channels)} channels")
+        self.logger.info(f"📡 正在抓取 {len(channels)} 个频道的节目数据")
 
         response = self.http_client.get(self.epg_url)
         root = ET.fromstring(response.text)
@@ -80,10 +80,10 @@ class CNEpgPlatform(BaseEPGPlatform):
                         ))
 
             except Exception as e:
-                self.logger.warning(f"Failed to parse program data: {e}")
+                self.logger.warning(f"⚠️ 解析节目数据失败: {e}")
                 continue
 
-        self.logger.info(f"Fetched {len(programs)} programs total")
+        self.logger.info(f"📊 总共抓取了 {len(programs)} 个节目")
         return programs
 
     def _parse_epg_time(self, time_str: str):
@@ -101,12 +101,12 @@ class CNEpgPlatform(BaseEPGPlatform):
             return shanghai_tz.localize(dt)
 
         except Exception as e:
-            self.logger.warning(f"Failed to parse time string '{time_str}': {e}")
+            self.logger.warning(f"⚠️ 解析时间字符串 '{time_str}' 失败: {e}")
             return None
 
     async def get_raw_xml(self) -> str:
         """Get the raw XML content from epg.pw"""
-        self.logger.info("Fetching raw XML from CN EPG")
+        self.logger.info("📡 正在从 CN EPG 获取原始 XML")
 
         response = self.http_client.get(self.epg_url)
 
@@ -125,5 +125,5 @@ async def get_cn_channels_epg():
     try:
         return await cn_epg_platform.get_raw_xml()
     except Exception as e:
-        logger.error(f"Error in legacy get_cn_channels_epg function: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 get_cn_channels_epg 函数错误: {e}", exc_info=True)
         return ""

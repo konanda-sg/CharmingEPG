@@ -61,7 +61,7 @@ class HTTPClient:
             request_headers.update(headers)
 
         try:
-            logger.info(f"Making GET request to: {url}")
+            logger.info(f"🌐 发起GET请求: {url}")
 
             response = requests.get(
                 url,
@@ -80,14 +80,14 @@ class HTTPClient:
                     url=url
                 )
 
-            logger.debug(f"Successfully fetched: {url} (Status: {response.status_code})")
+            logger.debug(f"✅ 成功获取: {url} (状态: {response.status_code})")
             return response
 
         except requests.RequestException as e:
-            logger.error(f"Request failed for {url}: {e}")
+            logger.error(f"❌ 请求失败 {url}: {e}")
             raise
         except HTTPError as e:
-            logger.error(f"HTTP error for {url}: {e}")
+            logger.error(f"🚨 HTTP错误 {url}: {e}")
             raise
 
     @retry(
@@ -121,12 +121,12 @@ class HTTPClient:
         connector_kwargs = {}
         if self.proxies:
             # Note: aiohttp proxy configuration differs from requests
-            logger.debug(f"Using proxy: {self.proxies}")
+            logger.debug(f"🔌 使用代理: {self.proxies}")
 
         timeout = aiohttp.ClientTimeout(total=self.timeout)
 
         try:
-            logger.info(f"Making async GET request to: {url}")
+            logger.info(f"🌐 发起异步GET请求: {url}")
 
             async with aiohttp.ClientSession(
                 timeout=timeout,
@@ -142,14 +142,14 @@ class HTTPClient:
                             url=url
                         )
 
-                    logger.debug(f"Successfully fetched: {url} (Status: {response.status})")
+                    logger.debug(f"✅ 成功获取: {url} (状态: {response.status})")
                     return response
 
         except aiohttp.ClientError as e:
-            logger.error(f"Async request failed for {url}: {e}")
+            logger.error(f"❌ 异步请求失败 {url}: {e}")
             raise
         except HTTPError as e:
-            logger.error(f"HTTP error for {url}: {e}")
+            logger.error(f"🚨 HTTP错误 {url}: {e}")
             raise
 
     def post(self, url: str, data: Optional[Any] = None, json: Optional[Dict] = None,
@@ -175,7 +175,7 @@ class HTTPClient:
             request_headers.update(kwargs.pop('headers'))
 
         try:
-            logger.info(f"Making {method} request to: {url}")
+            logger.info(f"🌐 发起{method}请求: {url}")
 
             response = requests.request(
                 method,
@@ -193,11 +193,11 @@ class HTTPClient:
                     url=url
                 )
 
-            logger.debug(f"Successfully completed {method} request: {url} (Status: {response.status_code})")
+            logger.debug(f"✅ 成功完成{method}请求: {url} (状态: {response.status_code})")
             return response
 
         except requests.RequestException as e:
-            logger.error(f"{method} request failed for {url}: {e}")
+            logger.error(f"❌ {method}请求失败 {url}: {e}")
             raise
 
     @retry(
@@ -215,7 +215,7 @@ class HTTPClient:
         timeout = aiohttp.ClientTimeout(total=self.timeout)
 
         try:
-            logger.info(f"Making async {method} request to: {url}")
+            logger.info(f"🌐 发起异步{method}请求: {url}")
 
             async with aiohttp.ClientSession(timeout=timeout, headers=request_headers) as session:
                 async with session.request(method, url, **kwargs) as response:
@@ -226,11 +226,11 @@ class HTTPClient:
                             url=url
                         )
 
-                    logger.debug(f"Successfully completed async {method} request: {url} (Status: {response.status})")
+                    logger.debug(f"✅ 成功完成异步{method}请求: {url} (状态: {response.status})")
                     return response
 
         except aiohttp.ClientError as e:
-            logger.error(f"Async {method} request failed for {url}: {e}")
+            logger.error(f"❌ 异步{method}请求失败 {url}: {e}")
             raise
 
 

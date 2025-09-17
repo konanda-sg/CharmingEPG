@@ -25,7 +25,7 @@ class HamiPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from Hami Video API"""
-        self.logger.info("Fetching channel list from Hami Video")
+        self.logger.info("📡 正在获取 Hami Video 频道列表")
 
         params = {
             "appVersion": "7.12.806",
@@ -59,12 +59,12 @@ class HamiPlatform(BaseEPGPlatform):
                     raw_data=element
                 ))
 
-        self.logger.info(f"Found {len(channels)} channels from Hami Video")
+        self.logger.info(f"📺 发现 {len(channels)} 个 Hami Video 频道")
         return channels
 
     async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
         """Fetch program data for all channels"""
-        self.logger.info(f"Fetching program data for {len(channels)} channels")
+        self.logger.info(f"📡 正在抓取 {len(channels)} 个频道的节目数据")
 
         all_programs = []
         for channel in channels:
@@ -75,15 +75,15 @@ class HamiPlatform(BaseEPGPlatform):
                 )
                 all_programs.extend(programs)
             except Exception as e:
-                self.logger.error(f"Failed to fetch programs for channel {channel.name}: {e}")
+                self.logger.error(f"❌ 获取频道 {channel.name} 节目数据失败: {e}")
                 continue
 
-        self.logger.info(f"Fetched {len(all_programs)} programs total")
+        self.logger.info(f"📊 总共抓取了 {len(all_programs)} 个节目")
         return all_programs
 
     async def _fetch_channel_programs(self, channel_name: str, content_pk: str) -> List[Program]:
         """Fetch program data for a specific channel"""
-        self.logger.debug(f"Fetching programs for channel: {channel_name}")
+        self.logger.debug(f"🔍 正在获取频道节目: {channel_name}")
 
         programs = []
 
@@ -130,14 +130,14 @@ class HamiPlatform(BaseEPGPlatform):
                                         raw_data=program_info
                                     ))
                                 except Exception as e:
-                                    self.logger.warning(f"Failed to parse program time: {e}")
+                                    self.logger.warning(f"⚠️ 解析节目时间失败: {e}")
                                     continue
 
             except Exception as e:
-                self.logger.warning(f"Failed to fetch EPG for {channel_name} on day {i}: {e}")
+                self.logger.warning(f"⚠️ 获取 {channel_name} 第 {i} 天的 EPG 数据失败: {e}")
                 continue
 
-        self.logger.debug(f"Found {len(programs)} programs for {channel_name}")
+        self.logger.debug(f"📺 在 {channel_name} 中发现 {len(programs)} 个节目")
         return programs
 
     def _parse_hami_time(self, time_range: str):
@@ -166,7 +166,7 @@ async def request_channel_list():
         channels = await hami_platform.fetch_channels()
         return [{"channelName": ch.name, "contentPk": ch.channel_id} for ch in channels]
     except Exception as e:
-        logger.error(f"Error in legacy request_channel_list function: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 request_channel_list 函数错误: {e}", exc_info=True)
         return []
 
 
@@ -176,7 +176,7 @@ async def get_programs_with_retry(channel):
         programs = await request_epg(channel['channelName'], channel['contentPk'])
         return programs
     except Exception as e:
-        logger.error(f"Error requesting EPG for {channel['channelName']}: {e}")
+        logger.error(f"❌ 请求 {channel['channelName']} EPG 数据错误: {e}")
         return []
 
 
@@ -202,7 +202,7 @@ async def request_all_epg():
         return raw_channels, raw_programs
 
     except Exception as e:
-        logger.error(f"Error in legacy request_all_epg function: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 request_all_epg 函数错误: {e}", exc_info=True)
         return [], []
 
 
@@ -224,7 +224,7 @@ async def request_epg(channel_name: str, content_pk: str):
 
         return result
     except Exception as e:
-        logger.error(f"Error in legacy request_epg function: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 request_epg 函数错误: {e}", exc_info=True)
         return []
 
 

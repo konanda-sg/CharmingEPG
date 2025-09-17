@@ -20,7 +20,7 @@ class StarhubPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from StarHub API"""
-        self.logger.info("Fetching channel list from StarHub")
+        self.logger.info("📡 正在从 StarHub 获取频道列表")
 
         headers = self.get_default_headers()
 
@@ -49,12 +49,12 @@ class StarhubPlatform(BaseEPGPlatform):
                     raw_data=resource
                 ))
 
-        self.logger.info(f"Found {len(channels)} channels from StarHub")
+        self.logger.info(f"📺 从 StarHub 发现 {len(channels)} 个频道")
         return channels
 
     async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
         """Fetch program data for all StarHub channels"""
-        self.logger.info(f"Fetching program data for {len(channels)} StarHub channels")
+        self.logger.info(f"📡 正在抓取 {len(channels)} 个 StarHub 频道的节目数据")
 
         all_programs = []
 
@@ -63,15 +63,15 @@ class StarhubPlatform(BaseEPGPlatform):
                 programs = await self._fetch_channel_programs(channel)
                 all_programs.extend(programs)
             except Exception as e:
-                self.logger.error(f"Failed to fetch programs for {channel.name}: {e}")
+                self.logger.error(f"❌ 获取频道 {channel.name} 节目数据失败: {e}")
                 continue
 
-        self.logger.info(f"Fetched {len(all_programs)} programs total")
+        self.logger.info(f"📊 总共抓取了 {len(all_programs)} 个节目")
         return all_programs
 
     async def _fetch_channel_programs(self, channel: Channel) -> List[Program]:
         """Fetch program data for a specific StarHub channel"""
-        self.logger.debug(f"Fetching programs for channel: {channel.name} (ID: {channel.channel_id})")
+        self.logger.debug(f"🔍 正在获取频道节目: {channel.name} (ID: {channel.channel_id})")
 
         # Calculate time range (today to 6 days later)
         tz = ZoneInfo('Asia/Shanghai')
@@ -132,10 +132,10 @@ class StarhubPlatform(BaseEPGPlatform):
                     ))
 
                 except Exception as e:
-                    self.logger.warning(f"Failed to parse program data: {e}")
+                    self.logger.warning(f"⚠️ 解析节目数据失败: {e}")
                     continue
 
-        self.logger.debug(f"Found {len(programs)} programs for {channel.name}")
+        self.logger.debug(f"📺 在 {channel.name} 中发现 {len(programs)} 个节目")
         return programs
 
 
@@ -150,14 +150,14 @@ def request_channels():
         import asyncio
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            logger.warning("Legacy request_channels called from async context - returning empty list")
+            logger.warning("⚠️ 在异步上下文中调用旧版 request_channels - 返回空列表")
             return []
         else:
             channels = loop.run_until_complete(starhub_platform.fetch_channels())
             # Convert to legacy format
             return [{"channelName": ch.name, "channelId": ch.channel_id} for ch in channels]
     except Exception as e:
-        logger.error(f"Error in legacy request_channels: {e}")
+        logger.error(f"❌ 旧版 request_channels 错误: {e}")
         return []
 
 
@@ -167,7 +167,7 @@ def request_epg(channel_id, channel_name):
         import asyncio
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            logger.warning("Legacy request_epg called from async context - returning empty list")
+            logger.warning("⚠️ 在异步上下文中调用旧版 request_epg - 返回空列表")
             return []
         else:
             # Create a temporary channel object
@@ -187,7 +187,7 @@ def request_epg(channel_id, channel_name):
 
             return program_list
     except Exception as e:
-        logger.error(f"Error in legacy request_epg: {e}")
+        logger.error(f"❌ 旧版 request_epg 错误: {e}")
         return []
 
 
@@ -220,5 +220,5 @@ async def get_starhub_epg():
         return raw_channels, raw_programs
 
     except Exception as e:
-        logger.error(f"Error in legacy get_starhub_epg function: {e}", exc_info=True)
+        logger.error(f"❌ 旧版 get_starhub_epg 函数错误: {e}", exc_info=True)
         return [], []
