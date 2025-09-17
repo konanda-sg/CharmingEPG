@@ -18,7 +18,6 @@ async def get_starhub_epg():
             programme_list.extend(channel_program_list)
     except Exception as e:
         logger.error(f"Error requesting EPG for {channel['channelName']}: {e}")
-    print(programme_list)
     return channels, programme_list
 
 
