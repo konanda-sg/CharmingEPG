@@ -65,11 +65,7 @@ class NowTVPlatform(BaseEPGPlatform):
                     name=name,
                     channel_no=channel_no,
                     logo=logo,
-                    raw_data={
-                        'logo': logo,
-                        'name': name,
-                        'channelNo': channel_no
-                    }
+                    channelNo=channel_no
                 ))
                 channel_nums.append(channel_no)
 
@@ -118,7 +114,7 @@ class NowTVPlatform(BaseEPGPlatform):
                                 start_time=start_time,
                                 end_time=end_time,
                                 description="",
-                                raw_data=epg_item
+                                **epg_item
                             ))
 
                         except Exception as e:
@@ -143,11 +139,12 @@ class NowTVPlatform(BaseEPGPlatform):
 
         for day in range(1, 8):  # Days 1-7
             try:
-                params = {
-                    'channelIdList[]': channel_numbers,
-                    'day': str(day),
-                }
-
+                # Build params manually to handle multiple values for same key
+                params = []
+                for channel_num in channel_numbers:
+                    params.append(('channelIdList[]', channel_num))
+                params.append(('day', str(day)))
+                self.logger.info(f"🔍【NowTV】 第 {day} 天的 EPG 请求")
                 response = self.http_client.get(
                     f'{self.base_url}/tvguide/epglist',
                     headers=headers,
