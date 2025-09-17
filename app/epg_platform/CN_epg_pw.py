@@ -16,7 +16,7 @@ class CNEpgPlatform(BaseEPGPlatform):
 
     async def fetch_channels(self) -> List[Channel]:
         """Fetch channel list from CN EPG XML"""
-        self.logger.info("📡 正在从 CN EPG 获取频道列表")
+        self.logger.info("📡 正在从 EPG.PW获取CN频道列表")
 
         response = self.http_client.get(self.epg_url)
 

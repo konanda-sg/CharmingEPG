@@ -61,7 +61,7 @@ class HTTPClient:
             request_headers.update(headers)
 
         try:
-            logger.info(f"🌐 发起GET请求: {url}")
+            logger.debug(f"🌐 发起GET请求: {url}, params: {params} ,headers: {request_headers}")
 
             response = requests.get(
                 url,

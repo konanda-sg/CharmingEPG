@@ -83,7 +83,7 @@ class HamiPlatform(BaseEPGPlatform):
 
     async def _fetch_channel_programs(self, channel_name: str, content_pk: str) -> List[Program]:
         """Fetch program data for a specific channel"""
-        self.logger.debug(f"🔍 正在获取频道节目: {channel_name}")
+        self.logger.info(f"🔍【Hami】 正在获取频道节目: {channel_name}")
 
         programs = []
 

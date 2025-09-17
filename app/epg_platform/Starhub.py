@@ -71,7 +71,7 @@ class StarhubPlatform(BaseEPGPlatform):
 
     async def _fetch_channel_programs(self, channel: Channel) -> List[Program]:
         """Fetch program data for a specific StarHub channel"""
-        self.logger.debug(f"🔍 正在获取频道节目: {channel.name} (ID: {channel.channel_id})")
+        self.logger.info(f"🔍【Starhub】 正在获取频道节目: {channel.name} (ID: {channel.channel_id})")
 
         # Calculate time range (today to 6 days later)
         tz = ZoneInfo('Asia/Shanghai')

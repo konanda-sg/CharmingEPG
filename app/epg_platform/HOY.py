@@ -64,7 +64,7 @@ class HOYPlatform(BaseEPGPlatform):
 
     async def _fetch_channel_programs(self, channel: Channel) -> List[Program]:
         """Fetch program data for a specific HOY TV channel"""
-        self.logger.debug(f"🔍 正在获取频道节目: {channel.name}")
+        self.logger.info(f"🔍【HOY】 正在获取频道节目: {channel.name}")
 
         epg_url = channel.extra_data.get('epg_url')
         if not epg_url:

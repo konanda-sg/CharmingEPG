@@ -82,7 +82,7 @@ class MyTvSuperPlatform(BaseEPGPlatform):
 
     async def _fetch_channel_programs(self, network_code: str, channel_name: str) -> List[Program]:
         """Fetch program data for a specific channel"""
-        self.logger.debug(f"🔍 正在获取频道节目: {channel_name}")
+        self.logger.info(f"🔍 【myTV SUPER】 正在获取频道节目: {channel_name}")
 
         # Get date range (today + 7 days)
         start_date = datetime.now().strftime('%Y%m%d')

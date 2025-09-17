@@ -59,7 +59,7 @@ class RTHKPlatform(BaseEPGPlatform):
 
     async def _fetch_channel_programs(self, channel: Channel) -> List[Program]:
         """Fetch program data for a specific RTHK channel"""
-        self.logger.debug(f"🔍 正在获取频道节目: {channel.name}")
+        self.logger.info(f"🔍【RTHK】 正在获取频道节目: {channel.name}")
 
         url = f"{self.base_url}/{channel.channel_id}"
 

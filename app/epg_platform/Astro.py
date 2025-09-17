@@ -93,7 +93,7 @@ class AstroPlatform(BaseEPGPlatform):
 
         for day in range(7):
             try:
-                self.logger.debug(f"🔍 正在获取第 {day} 天的 Astro EPG 数据")
+                self.logger.info(f"🔍 【Astro】正在获取第 {day} 天的 EPG 数据")
                 date_str, duration = self._get_date_params(day)
 
                 raw_epg = await self._query_epg(date_str, duration, channel_count, first_id)
