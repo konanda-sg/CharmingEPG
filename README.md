@@ -56,12 +56,33 @@ PROXY_HTTPS=http://proxy.example.com:8080
 
 
 ### Docker Compose
+docker-compose.yml示例
+```yaml
+version: '3.3'
+services:
+  charming_epg:
+    image: charmingcheung000/charming-epg:latest
+    container_name: charming_epg
+    environment:
+      - EPG_ENABLE_CN=true
+      - EPG_ENABLE_TVB=true
+      - EPG_ENABLE_NOWTV=true
+      - EPG_ENABLE_HAMI=true
+      - EPG_ENABLE_ASTRO=true
+      - EPG_ENABLE_RTHK=true
+      - EPG_ENABLE_HOY=true
+      - EPG_ENABLE_STARHUB=true
+      - TZ=Asia/Shanghai
+      - EPG_CACHE_TTL=3600
+    volumes:
+      - /root/docker/epg_data/epg_files:/code/epg_files
+    ports:
+      - "30008:80"
+    restart: always
+```
+
 
 ```bash
-cp docker-compose.example.yml docker-compose.yml
-#然后修改docker-compose.yml
-#.....
-
 #部署并运行
 docker-compose build && docker-compose up -d
 ```
@@ -81,7 +102,7 @@ docker run -d \
   -e EPG_ENABLE_RTHK=false \
   -e EPG_ENABLE_HOY=false \
   -e EPG_ENABLE_STARHUB=false \
-  $(docker build -q .)
+  charmingcheung000/charming-epg:latest
 ```
 
 ### Request
