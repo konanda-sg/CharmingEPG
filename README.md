@@ -19,9 +19,10 @@
 
 ## How to use
 
-### 配置需要启用的平台
+### 环境变量
 
 ```dotenv
+#配置需要启用的平台
 EPG_ENABLE_CN=true
 EPG_ENABLE_TVB=true
 EPG_ENABLE_NOWTV=false
@@ -30,10 +31,29 @@ EPG_ENABLE_ASTRO=false
 EPG_ENABLE_RTHK=false
 EPG_ENABLE_HOY=false
 EPG_ENABLE_STARHUB=false
+#支持`1`/`0` `yes`/`no` `true`/`false` `on`/`off`
+#这些配置已经在`docker-compose.example.yml`中列好，自行配置即可。
+
+###以下为可选项###
+#日志
+LOG_LEVEL=INFO
+LOG_ROTATION=10 MB
+LOG_RETENTION=7 days
+
+#EPG
+EPG_CACHE_TTL=3600 #EPG返回header的缓存ttl，方便配合CF做缓存
+EPG_UPDATE_INTERVAL=10 #每10分钟检查一次是否要更新（如果当天已更新会忽略）
+
+#HTTP
+HTTP_TIMEOUT=30 #默认30秒超时
+HTTP_MAX_RETRIES=3 #默认3次重试
+
+#Proxy
+PROXY_HTTP=http://proxy.example.com:8080
+PROXY_HTTPS=http://proxy.example.com:8080
 ```
 
-支持`1`/`0` `yes`/`no` `true`/`false` `on`/`off`
-这些配置已经在`docker-compose.example.yml`中列好，自行配置即可。
+
 
 ### Docker Compose
 
