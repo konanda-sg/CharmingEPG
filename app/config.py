@@ -22,6 +22,7 @@ class Config:
     EPG_UPDATE_INTERVAL = int(os.getenv("EPG_UPDATE_INTERVAL", "10"))  # minutes
     EPG_BASE_DIR = os.getenv("EPG_BASE_DIR", "epg_files")
     EPG_TIMEZONE = os.getenv("EPG_TIMEZONE", "Asia/Shanghai")
+    EPG_CACHE_TTL = int(os.getenv("EPG_CACHE_TTL", "3600"))  # seconds (default: 1 hour)
 
     # HTTP client settings
     HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "30"))

@@ -196,6 +196,8 @@ class EPGFileManager:
             media_type="application/xml",
             headers={
                 "Content-Disposition": "attachment; filename=epg.xml",
+                "Cache-Control": f"public, max-age={Config.EPG_CACHE_TTL}, s-maxage={Config.EPG_CACHE_TTL}",
+                "ETag": f'"epg-{datetime.now().strftime("%Y%m%d")}-{",".join(platforms)}"',
                 "X-Total-Channels": str(total_channels),
                 "X-Total-Programs": str(total_programs),
                 "X-Platforms": ",".join(platforms)
@@ -238,6 +240,8 @@ class EPGFileManager:
                 media_type="application/xml",
                 headers={
                     "Content-Disposition": f"attachment; filename={platform}_epg.xml",
+                    "Cache-Control": f"public, max-age={Config.EPG_CACHE_TTL}, s-maxage={Config.EPG_CACHE_TTL}",
+                    "ETag": f'"epg-{platform}-{datetime.now().strftime("%Y%m%d")}"',
                     "X-Platform": platform,
                     "X-Total-Channels": str(channel_count),
                     "X-Total-Programs": str(program_count)
@@ -251,6 +255,8 @@ class EPGFileManager:
                 media_type="application/xml",
                 headers={
                     "Content-Disposition": f"attachment; filename={platform}_epg.xml",
+                    "Cache-Control": f"public, max-age={Config.EPG_CACHE_TTL}, s-maxage={Config.EPG_CACHE_TTL}",
+                    "ETag": f'"epg-{platform}-{datetime.now().strftime("%Y%m%d")}"',
                     "X-Platform": platform
                 }
             )
