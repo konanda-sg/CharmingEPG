@@ -1,156 +1,307 @@
 import json
-import os
-from datetime import datetime
-
-import requests
-from loguru import logger
+import pytz
 import xml.etree.ElementTree as ET
+from datetime import datetime
+from typing import List
 from bs4 import BeautifulSoup
 
-from dotenv import load_dotenv
-import pytz
+from ..config import Config
+from ..logger import get_logger
+from .base import BaseEPGPlatform, Channel, Program
 
-load_dotenv(verbose=True, override=True)
-
-PROXY_HTTP = os.getenv("PROXY_HTTP", None)
-PROXY_HTTPS = os.getenv("PROXY_HTTPS", None)
-UA = os.getenv("UA",
-               "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
-
-PROXIES = None
-
-if PROXY_HTTP and PROXY_HTTPS:
-    PROXIES = {
-        "http": PROXY_HTTP,
-        "https": PROXY_HTTP
-    }
-
-CHANNEL_LIST = []
-CHANNEL_NUMS = []
+logger = get_logger(__name__)
 
 
-def get_official_channel_list():
-    url = 'https://nowplayer.now.com/channels'
-    HEADER = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Referer': 'https://nowplayer.now.com/channels',
-        'User-Agent': UA,
-        'accept-language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ar-EG;q=0.6,ar;q=0.5'
-    }
+class NowTVPlatform(BaseEPGPlatform):
+    """NowTV EPG platform implementation"""
 
-    response = requests.get(url, headers=HEADER, cookies={'LANG': 'zh'})
+    def __init__(self):
+        super().__init__("nowtv")
+        self.base_url = "https://nowplayer.now.com"
+        self.channels_cache = []
+        self.channel_nums_cache = []
 
-    soup = BeautifulSoup(response.text, 'html.parser')
-    channels = []
+    async def fetch_channels(self) -> List[Channel]:
+        """Fetch channel list from NowTV website"""
+        self.logger.info("Fetching channel list from NowTV")
 
-    # 找到所有channel项
-    items = soup.find_all('div', class_='product-item')
-    channel_nums = []
-    for item in items:
-        # 获取logo图片URL
-        img_tag = item.find('img')
-        logo = img_tag['src'] if img_tag else None
-
-        # 获取频道名称
-        name_tag = item.find('p', class_='img-name')
-        name = name_tag.text if name_tag else None
-
-        # 获取频道号
-        channel_tag = item.find('p', class_='channel')
-        channel_no = channel_tag.text.replace('CH', '') if channel_tag else None
-
-        channels.append({
-            'logo': logo,
-            'name': name,
-            'channelNo': channel_no
+        headers = self.get_default_headers({
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Referer': f'{self.base_url}/channels',
+            'accept-language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ar-EG;q=0.6,ar;q=0.5'
         })
-        channel_nums.append(channel_no)
-    CHANNEL_LIST.clear()
-    CHANNEL_LIST.extend(channels)
-    CHANNEL_NUMS.clear()
-    CHANNEL_NUMS.extend(channel_nums)
+
+        # Use cookies to set language to Chinese
+        response = self.http_client.get(
+            f"{self.base_url}/channels",
+            headers=headers,
+            cookies={'LANG': 'zh'}
+        )
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        channels = []
+        channel_nums = []
+
+        # Find all channel items
+        items = soup.find_all('div', class_='product-item')
+
+        for item in items:
+            # Get logo image URL
+            img_tag = item.find('img')
+            logo = img_tag['src'] if img_tag else None
+
+            # Get channel name
+            name_tag = item.find('p', class_='img-name')
+            name = name_tag.text if name_tag else None
+
+            # Get channel number
+            channel_tag = item.find('p', class_='channel')
+            channel_no = channel_tag.text.replace('CH', '') if channel_tag else None
+
+            if name and channel_no:
+                channels.append(Channel(
+                    channel_id=channel_no,
+                    name=name,
+                    channel_no=channel_no,
+                    logo=logo,
+                    raw_data={
+                        'logo': logo,
+                        'name': name,
+                        'channelNo': channel_no
+                    }
+                ))
+                channel_nums.append(channel_no)
+
+        # Cache for later use
+        self.channels_cache = channels
+        self.channel_nums_cache = channel_nums
+
+        self.logger.info(f"Found {len(channels)} channels from NowTV")
+        return channels
+
+    async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
+        """Fetch program data for all channels"""
+        self.logger.info(f"Fetching program data for {len(channels)} channels")
+
+        # Get channel numbers for EPG fetching
+        channel_numbers = [ch.extra_data.get('channelNo') for ch in channels if ch.extra_data.get('channelNo')]
+
+        if not channel_numbers:
+            self.logger.warning("No channel numbers found for EPG fetching")
+            return []
+
+        # Fetch 7-day EPG data
+        epg_data = await self._fetch_7day_epg(channel_numbers)
+        programs = []
+
+        # Process EPG data for each day
+        for day in range(1, 8):  # Days 1-7
+            day_epg = epg_data.get(day, [])
+
+            for channel_index, channel_epg in enumerate(day_epg):
+                if channel_index < len(channel_numbers):
+                    channel_no = channel_numbers[channel_index]
+                    channel_name = self._find_channel_name(channels, channel_no)
+
+                    for epg_item in channel_epg:
+                        try:
+                            start_timestamp = epg_item.get("start", 0) / 1000
+                            end_timestamp = epg_item.get("end", 0) / 1000
+
+                            start_time = self._timestamp_to_datetime(start_timestamp)
+                            end_time = self._timestamp_to_datetime(end_timestamp)
+
+                            programs.append(Program(
+                                channel_id=channel_no,
+                                title=epg_item.get("name", ""),
+                                start_time=start_time,
+                                end_time=end_time,
+                                description="",
+                                raw_data=epg_item
+                            ))
+
+                        except Exception as e:
+                            self.logger.warning(f"Failed to parse program data: {e}")
+                            continue
+
+        self.logger.info(f"Fetched {len(programs)} programs total")
+        return programs
+
+    async def _fetch_7day_epg(self, channel_numbers: List[str]) -> dict:
+        """Fetch 7-day EPG data from NowTV API"""
+        epg_cache = {}
+
+        headers = self.get_default_headers({
+            'Accept': 'text/plain, */*; q=0.01',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Referer': f'{self.base_url}/tvguide',
+            'X-Requested-With': 'XMLHttpRequest',
+        })
+
+        cookies = {'LANG': 'zh'}
+
+        for day in range(1, 8):  # Days 1-7
+            try:
+                params = {
+                    'channelIdList[]': channel_numbers,
+                    'day': str(day),
+                }
+
+                response = self.http_client.get(
+                    f'{self.base_url}/tvguide/epglist',
+                    headers=headers,
+                    cookies=cookies,
+                    params=params
+                )
+
+                self.logger.debug(f"EPG request for day {day}: status {response.status_code}")
+
+                if response.status_code == 200:
+                    epg_cache[day] = response.json()
+                else:
+                    self.logger.warning(f"Failed to fetch EPG for day {day}: status {response.status_code}")
+                    epg_cache[day] = []
+
+            except Exception as e:
+                self.logger.error(f"Error fetching EPG for day {day}: {e}")
+                epg_cache[day] = []
+
+        return epg_cache
+
+    def _find_channel_name(self, channels: List[Channel], channel_no: str) -> str:
+        """Find channel name by channel number"""
+        for channel in channels:
+            if channel.extra_data.get('channelNo') == channel_no:
+                return channel.name
+        return f"Channel {channel_no}"
+
+    def _timestamp_to_datetime(self, timestamp: float) -> datetime:
+        """Convert timestamp to Shanghai timezone datetime"""
+        utc_dt = datetime.fromtimestamp(timestamp, tz=pytz.UTC)
+        target_tz = pytz.timezone('Asia/Shanghai')
+        local_dt = utc_dt.astimezone(target_tz)
+        return local_dt
+
+    async def generate_epg_xml_direct(self, channel_numbers: List[str] = None) -> bytes:
+        """Generate EPG XML directly (legacy method)"""
+        if not channel_numbers:
+            channels = await self.fetch_channels()
+            channel_numbers = [ch.extra_data.get('channelNo') for ch in channels if ch.extra_data.get('channelNo')]
+
+        epg_data = await self._fetch_7day_epg(channel_numbers)
+        channels = self.channels_cache if self.channels_cache else await self.fetch_channels()
+
+        tv = ET.Element("tv", {"generator-info-name": f"{Config.APP_NAME} NowTV"})
+
+        # Create channel elements
+        for channel_no in channel_numbers:
+            channel_name = self._find_channel_name(channels, channel_no)
+            channel_elem = ET.SubElement(tv, "channel", id=channel_name)
+            display_name = ET.SubElement(channel_elem, "display-name", lang="zh")
+            display_name.text = channel_name
+
+        # Create programme elements
+        for day in range(1, 8):
+            day_epg = epg_data.get(day, [])
+            for channel_index, channel_epg in enumerate(day_epg):
+                if channel_index < len(channel_numbers):
+                    channel_no = channel_numbers[channel_index]
+                    channel_name = self._find_channel_name(channels, channel_no)
+
+                    for epg_item in channel_epg:
+                        try:
+                            start_timestamp = epg_item.get("start", 0) / 1000
+                            end_timestamp = epg_item.get("end", 0) / 1000
+
+                            start_time_str = self._timestamp_to_timezone_str(start_timestamp)
+                            end_time_str = self._timestamp_to_timezone_str(end_timestamp)
+
+                            programme = ET.SubElement(tv, "programme",
+                                                    channel=channel_name,
+                                                    start=start_time_str,
+                                                    stop=end_time_str)
+                            title = ET.SubElement(programme, "title", lang="zh")
+                            title.text = epg_item.get("name", "")
+
+                        except Exception as e:
+                            self.logger.warning(f"Failed to create programme element: {e}")
+                            continue
+
+        return ET.tostring(tv, encoding='utf-8')
+
+    def _timestamp_to_timezone_str(self, timestamp: float) -> str:
+        """Convert timestamp to timezone string format"""
+        utc_dt = datetime.fromtimestamp(timestamp, tz=pytz.UTC)
+        target_tz = pytz.timezone('Asia/Shanghai')
+        local_dt = utc_dt.astimezone(target_tz)
+        return local_dt.strftime('%Y%m%d%H%M%S %z')
+
+
+# Create platform instance
+nowtv_platform = NowTVPlatform()
+
+
+# Legacy functions for backward compatibility
+def get_official_channel_list():
+    """Legacy function - get channel list (synchronous)"""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we're already in an async context, we can't use run()
+            # This is a limitation of the legacy sync function
+            logger.warning("get_official_channel_list called from async context - returning empty list")
+            return []
+        else:
+            channels = loop.run_until_complete(nowtv_platform.fetch_channels())
+            nowtv_platform.channels_cache = channels
+            nowtv_platform.channel_nums_cache = [ch.extra_data.get('channelNo') for ch in channels]
+            return [ch.extra_data for ch in channels]
+    except Exception as e:
+        logger.error(f"Error in legacy get_official_channel_list: {e}")
+        return []
 
 
 async def request_nowtv_today_epg():
-    get_official_channel_list()
-    xml_str = await get_now_tv_guide_to_epg(CHANNEL_NUMS, "all")
-    return xml_str
+    """Legacy function - fetch NowTV EPG as XML"""
+    try:
+        channels = await nowtv_platform.fetch_channels()
+        channel_numbers = [ch.extra_data.get('channelNo') for ch in channels if ch.extra_data.get('channelNo')]
+        xml_bytes = await nowtv_platform.generate_epg_xml_direct(channel_numbers)
+        return xml_bytes
+    except Exception as e:
+        logger.error(f"Error in legacy request_nowtv_today_epg: {e}", exc_info=True)
+        return b""
 
 
 async def get_now_tv_guide_to_epg(channel_numbers, cache_keyword):
-    current_date = datetime.now().date()
-    cache_key = f"{current_date}_{cache_keyword}"
-
-    epg7Day = await fetch_7day_epg(channel_numbers)
-    channels = CHANNEL_LIST
-    tv = ET.Element("tv", {"generator-info-name": "Charming"})
-
-    for sportChannel in channel_numbers:
-        channelName = find_channel_name(channels, "{0}".format(sportChannel))
-        # 创建 channel 元素
-        channel = ET.SubElement(tv, "channel", id=channelName)
-        display_name = ET.SubElement(channel, "display-name", lang="zh")
-        display_name.text = channelName
-
-    for day in range(1, 7 + 1):
-        epgArray = epg7Day[day]
-        for index, epgChild in enumerate(epgArray):
-            channelName = find_channel_name(channels, "{0}".format(channel_numbers[index]))
-            for epgItem in epgChild:
-                start_time = time_stamp_to_timezone_str(epgItem["start"] / 1000)
-                end_time = time_stamp_to_timezone_str(epgItem["end"] / 1000)
-                programme = ET.SubElement(tv, "programme", channel=channelName, start=start_time, stop=end_time)
-                title = ET.SubElement(programme, "title", lang="zh")
-                title.text = epgItem.get("name", "")
-    # 转换为字符串并格式化
-    xml_str = ET.tostring(tv, encoding='utf-8')
-    return xml_str
+    """Legacy function - generate EPG XML"""
+    try:
+        xml_bytes = await nowtv_platform.generate_epg_xml_direct(channel_numbers)
+        return xml_bytes
+    except Exception as e:
+        logger.error(f"Error in legacy get_now_tv_guide_to_epg: {e}", exc_info=True)
+        return b""
 
 
 def time_stamp_to_timezone_str(timestamp_s):
-    utc_dt = datetime.fromtimestamp(timestamp_s, tz=pytz.UTC)
-    target_tz = pytz.timezone('Asia/Shanghai')
-    local_dt = utc_dt.astimezone(target_tz)
-    formatted_time = local_dt.strftime('%Y%m%d%H%M%S %z')
-    return formatted_time
+    """Legacy utility function"""
+    return nowtv_platform._timestamp_to_timezone_str(timestamp_s)
 
 
 def find_channel_name(channels, channel_no):
+    """Legacy utility function"""
     for item in channels:
-        if item["channelNo"] == channel_no:
-            return item["name"]
+        if item.get("channelNo") == channel_no:
+            return item.get("name")
+    return f"Channel {channel_no}"
 
 
 async def fetch_7day_epg(channel_numbers):
-    sport_epg_cache = {}
-    MIN_DAY = 1
-    MaxDay = 7
-    HEADERS = {
-        'Accept': 'text/plain, */*; q=0.01',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Referer': 'https://nowplayer.now.com/tvguide',
-        'X-Requested-With': 'XMLHttpRequest',
-        'User-Agent': UA,
-    }
-    COOKIES = {
-        'LANG': 'zh'
-    }
-    for day in range(MIN_DAY, MaxDay + 1):
-        params = {
-            'channelIdList[]': channel_numbers,
-            'day': str(day),
-        }
-        response = requests.get(
-            'https://nowplayer.now.com/tvguide/epglist',
-            params=params,
-            headers=HEADERS,
-            cookies=COOKIES,
-            proxies=PROXIES,
-        )
-        logger.info(f"url:{response.url} status:{response.status_code}")
-        if response.status_code == 200:
-            response_json = response.json()
-            sport_epg_cache[day] = response.json()  # 假设返回 JSON 数据
-
-    return sport_epg_cache
+    """Legacy function - fetch 7-day EPG"""
+    try:
+        return await nowtv_platform._fetch_7day_epg(channel_numbers)
+    except Exception as e:
+        logger.error(f"Error in legacy fetch_7day_epg: {e}", exc_info=True)
+        return {}

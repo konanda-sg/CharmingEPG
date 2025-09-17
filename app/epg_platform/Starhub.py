@@ -1,100 +1,224 @@
-import json
 from datetime import datetime, timedelta
+from typing import List
 from zoneinfo import ZoneInfo
-import requests
-from loguru import logger
 
-from app.utils import has_chinese, utc_to_utc8_datetime
+from ..logger import get_logger
+from ..utils import has_chinese, utc_to_utc8_datetime
+from .base import BaseEPGPlatform, Channel, Program
+
+logger = get_logger(__name__)
 
 
-async def get_starhub_epg():
-    programme_list = []
-    channels = []
-    try:
-        channels = request_channels()
-        logger.info(f"[Starhub]获取到共{len(channels)}个频道")
+class StarhubPlatform(BaseEPGPlatform):
+    """StarHub EPG platform implementation"""
+
+    def __init__(self):
+        super().__init__("starhub")
+        self.base_url = "https://waf-starhub-metadata-api-p001.ifs.vubiquity.com/v3.1/epg"
+        self.channels_url = f"{self.base_url}/channels"
+        self.schedules_url = f"{self.base_url}/schedules"
+
+    async def fetch_channels(self) -> List[Channel]:
+        """Fetch channel list from StarHub API"""
+        self.logger.info("Fetching channel list from StarHub")
+
+        headers = self.get_default_headers()
+
+        params = {
+            "locale": "zh",
+            "locale_default": "en_US",
+            "device": "1",
+            "limit": "150",
+            "page": "1"
+        }
+
+        response = self.http_client.get(
+            self.channels_url,
+            headers=headers,
+            params=params
+        )
+
+        data = response.json()
+        channels = []
+
+        for resource in data.get('resources', []):
+            if resource.get('metatype') == 'Channel':
+                channels.append(Channel(
+                    channel_id=resource.get('id', ''),
+                    name=resource.get('title', ''),
+                    raw_data=resource
+                ))
+
+        self.logger.info(f"Found {len(channels)} channels from StarHub")
+        return channels
+
+    async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
+        """Fetch program data for all StarHub channels"""
+        self.logger.info(f"Fetching program data for {len(channels)} StarHub channels")
+
+        all_programs = []
+
         for channel in channels:
-            channel_program_list = request_epg(channel['channelId'], channel['channelName'])
-            programme_list.extend(channel_program_list)
-    except Exception as e:
-        logger.error(f"Error requesting EPG for {channel['channelName']}: {e}")
-    return channels, programme_list
+            try:
+                programs = await self._fetch_channel_programs(channel)
+                all_programs.extend(programs)
+            except Exception as e:
+                self.logger.error(f"Failed to fetch programs for {channel.name}: {e}")
+                continue
+
+        self.logger.info(f"Fetched {len(all_programs)} programs total")
+        return all_programs
+
+    async def _fetch_channel_programs(self, channel: Channel) -> List[Program]:
+        """Fetch program data for a specific StarHub channel"""
+        self.logger.debug(f"Fetching programs for channel: {channel.name} (ID: {channel.channel_id})")
+
+        # Calculate time range (today to 6 days later)
+        tz = ZoneInfo('Asia/Shanghai')
+        today_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        six_days_later = today_start + timedelta(days=6)
+        six_days_later_end = six_days_later.replace(hour=23, minute=59, second=59)
+
+        today_timestamp = int(today_start.timestamp())
+        six_days_later_timestamp = int(six_days_later_end.timestamp())
+
+        headers = self.get_default_headers()
+
+        params = {
+            "locale": "zh",
+            "locale_default": "en_US",
+            "device": "1",
+            "limit": "500",
+            "page": "1",
+            "in_channel_id": channel.channel_id,
+            "gt_end": str(today_timestamp),      # Start time
+            "lt_start": str(six_days_later_timestamp),  # End time
+        }
+
+        response = self.http_client.get(
+            self.schedules_url,
+            headers=headers,
+            params=params
+        )
+
+        data = response.json()
+        programs = []
+
+        for resource in data.get('resources', []):
+            if resource.get('metatype') == 'Schedule':
+                try:
+                    title = resource.get('title', '')
+                    description = resource.get('description', '')
+                    episode_number = resource.get('episode_number')
+
+                    # Add episode number based on language
+                    if episode_number:
+                        if has_chinese(title) or has_chinese(description):
+                            title += f" 第{episode_number}集"
+                        else:
+                            title += f" Ep{episode_number}"
+
+                    # Convert timestamps to datetime objects
+                    start_time = utc_to_utc8_datetime(resource.get('start'))
+                    end_time = utc_to_utc8_datetime(resource.get('end'))
+
+                    programs.append(Program(
+                        channel_id=channel.channel_id,
+                        title=title,
+                        start_time=start_time,
+                        end_time=end_time,
+                        description=description,
+                        raw_data=resource
+                    ))
+
+                except Exception as e:
+                    self.logger.warning(f"Failed to parse program data: {e}")
+                    continue
+
+        self.logger.debug(f"Found {len(programs)} programs for {channel.name}")
+        return programs
 
 
+# Create platform instance
+starhub_platform = StarhubPlatform()
+
+
+# Legacy functions for backward compatibility
 def request_channels():
-    url = 'https://waf-starhub-metadata-api-p001.ifs.vubiquity.com/v3.1/epg/channels'
-    params = {
-        "locale": 'zh',
-        "locale_default": "en_US",
-        "device": "1",
-        "limit": "150",
-        "page": "1"
-    }
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
-    }
-    result = requests.get(url, params=params, headers=headers)
-    result.raise_for_status()
-    result_json = result.json()
-    channels = []
-    for channel in result_json['resources']:
-        if channel['metatype'] == 'Channel':
-            channels.append({"channelName": channel['title'], "channelId": channel['id']})
-
-    return channels
+    """Legacy function - get StarHub channel list (synchronous)"""
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            logger.warning("Legacy request_channels called from async context - returning empty list")
+            return []
+        else:
+            channels = loop.run_until_complete(starhub_platform.fetch_channels())
+            # Convert to legacy format
+            return [{"channelName": ch.name, "channelId": ch.channel_id} for ch in channels]
+    except Exception as e:
+        logger.error(f"Error in legacy request_channels: {e}")
+        return []
 
 
 def request_epg(channel_id, channel_name):
-    logger.info(f"[Starhub]正在获取 {channel_name} 节目表,ID={channel_id}...")
-    url = 'https://waf-starhub-metadata-api-p001.ifs.vubiquity.com/v3.1/epg/schedules'
+    """Legacy function - get EPG for specific channel (synchronous)"""
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            logger.warning("Legacy request_epg called from async context - returning empty list")
+            return []
+        else:
+            # Create a temporary channel object
+            channel = Channel(channel_id=channel_id, name=channel_name)
+            programs = loop.run_until_complete(starhub_platform._fetch_channel_programs(channel))
 
-    tz = ZoneInfo('Asia/Shanghai')
+            # Convert to legacy format
+            program_list = []
+            for program in programs:
+                program_list.append({
+                    "channelName": channel_name,
+                    "programName": program.title,
+                    "description": program.description,
+                    "start": program.start_time,
+                    "end": program.end_time
+                })
 
-    # 获取今天0点0分0秒
-    today_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_timestamp = int(today_start.timestamp())
+            return program_list
+    except Exception as e:
+        logger.error(f"Error in legacy request_epg: {e}")
+        return []
 
-    # 获取6天后的23点59分59秒
-    six_days_later = today_start + timedelta(days=6)
-    six_days_later_end = six_days_later.replace(hour=23, minute=59, second=59)
-    six_days_later_timestamp = int(six_days_later_end.timestamp())
 
-    params = {
-        "locale": 'zh',
-        "locale_default": "en_US",
-        "device": "1",
-        "limit": "500",
-        "page": "1",
-        "in_channel_id": channel_id,
-        "gt_end": str(today_timestamp),  # 这个才是开始时间 通常是东八区0点0分0秒
-        "lt_start": str(six_days_later_timestamp),  # 这个才是结束时间，通常是东八区23点59分59秒
-    }
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
-    }
+async def get_starhub_epg():
+    """Legacy function - fetch StarHub EPG data"""
+    try:
+        channels = await starhub_platform.fetch_channels()
+        programs = await starhub_platform.fetch_programs(channels)
 
-    result = requests.get(url, params=params, headers=headers)
-    result.raise_for_status()
-    result_json = result.json()
-    program_list = []
-    for program in result_json['resources']:
-        if program['metatype'] == 'Schedule':
-            episodeNumber = program.get("episode_number")
-            title = program['title']
-            description = program['description']
-            if has_chinese(title) or has_chinese(description):
-                episodeNumber = f" 第{episodeNumber}集" if episodeNumber else ""
-            else:
-                episodeNumber = f" Ep{episodeNumber}" if episodeNumber else ""
-            program_list.append({
-                "channelName": channel_name,
-                "programName": title + episodeNumber,
-                "description": description,
-                "start": utc_to_utc8_datetime(program['start']),
-                "end": utc_to_utc8_datetime(program['end'])
+        # Convert to legacy format
+        raw_channels = []
+        raw_programs = []
+
+        for channel in channels:
+            raw_channels.append({
+                "channelName": channel.name,
+                "channelId": channel.channel_id
             })
-    return program_list
 
+        for program in programs:
+            channel_name = next((ch.name for ch in channels if ch.channel_id == program.channel_id), "")
+            raw_programs.append({
+                "channelName": channel_name,
+                "programName": program.title,
+                "description": program.description,
+                "start": program.start_time,
+                "end": program.end_time
+            })
 
-if __name__ == '__main__':
-    request_epg("38251a1a-9368-410c-9dc5-ab806d74420f")
+        return raw_channels, raw_programs
+
+    except Exception as e:
+        logger.error(f"Error in legacy get_starhub_epg function: {e}", exc_info=True)
+        return [], []

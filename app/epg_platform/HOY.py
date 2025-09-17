@@ -1,138 +1,227 @@
 import xml.etree.ElementTree as ET
-from datetime import datetime
 import pytz
-import requests
+from datetime import datetime
+from typing import List
+
+from ..logger import get_logger
+from .base import BaseEPGPlatform, Channel, Program
+
+logger = get_logger(__name__)
 
 
+class HOYPlatform(BaseEPGPlatform):
+    """HOY TV EPG platform implementation"""
+
+    def __init__(self):
+        super().__init__("hoy")
+        self.channel_list_url = "https://api2.hoy.tv/api/v3/a/channel"
+
+    async def fetch_channels(self) -> List[Channel]:
+        """Fetch channel list from HOY TV API"""
+        self.logger.info("Fetching channel list from HOY TV")
+
+        response = self.http_client.get(self.channel_list_url)
+        data = response.json()
+
+        channels = []
+
+        if data.get('code') == 200:
+            for raw_channel in data.get('data', []):
+                name_info = raw_channel.get('name', {})
+                channel_name = name_info.get('zh_hk', name_info.get('en', 'Unknown'))
+
+                epg_url = raw_channel.get('epg')
+                logo = raw_channel.get('image')
+
+                if channel_name and epg_url:
+                    channels.append(Channel(
+                        channel_id=str(raw_channel.get('id', '')),
+                        name=channel_name,
+                        epg_url=epg_url,
+                        logo=logo,
+                        raw_data=raw_channel
+                    ))
+
+        self.logger.info(f"Found {len(channels)} channels from HOY TV")
+        return channels
+
+    async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
+        """Fetch program data for all HOY TV channels"""
+        self.logger.info(f"Fetching program data for {len(channels)} HOY TV channels")
+
+        all_programs = []
+
+        for channel in channels:
+            try:
+                programs = await self._fetch_channel_programs(channel)
+                all_programs.extend(programs)
+            except Exception as e:
+                self.logger.error(f"Failed to fetch programs for {channel.name}: {e}")
+                continue
+
+        self.logger.info(f"Fetched {len(all_programs)} programs total")
+        return all_programs
+
+    async def _fetch_channel_programs(self, channel: Channel) -> List[Program]:
+        """Fetch program data for a specific HOY TV channel"""
+        self.logger.debug(f"Fetching programs for channel: {channel.name}")
+
+        epg_url = channel.extra_data.get('epg_url')
+        if not epg_url:
+            self.logger.warning(f"No EPG URL found for channel {channel.name}")
+            return []
+
+        response = self.http_client.get(epg_url)
+
+        programs = self._parse_epg_xml(response.text, channel)
+
+        self.logger.debug(f"Found {len(programs)} programs for {channel.name}")
+        return programs
+
+    def _parse_epg_xml(self, xml_content: str, channel: Channel) -> List[Program]:
+        """Parse EPG XML content for HOY TV"""
+        try:
+            root = ET.fromstring(xml_content)
+        except ET.ParseError as e:
+            self.logger.error(f"Failed to parse XML for {channel.name}: {e}")
+            return []
+
+        programs = []
+        shanghai_tz = pytz.timezone('Asia/Shanghai')
+        today = datetime.now(shanghai_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        for channel_elem in root.findall('./Channel'):
+            for epg_item in channel_elem.findall('./EpgItem'):
+                try:
+                    # Parse time strings
+                    start_time_elem = epg_item.find('./EpgStartDateTime')
+                    end_time_elem = epg_item.find('./EpgEndDateTime')
+
+                    if start_time_elem is None or end_time_elem is None:
+                        continue
+
+                    start_time_str = start_time_elem.text
+                    end_time_str = end_time_elem.text
+
+                    # Parse and localize times
+                    start_time = shanghai_tz.localize(datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S"))
+                    end_time = shanghai_tz.localize(datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S"))
+
+                    # Only include programs from today onwards
+                    if start_time.date() >= today.date():
+                        # Get episode information
+                        episode_info = epg_item.find('./EpisodeInfo')
+                        if episode_info is not None:
+                            short_desc_elem = episode_info.find('./EpisodeShortDescription')
+                            episode_index_elem = episode_info.find('./EpisodeIndex')
+
+                            short_desc = short_desc_elem.text if short_desc_elem is not None else ""
+                            episode_index = episode_index_elem.text if episode_index_elem is not None else "0"
+
+                            # Build program name
+                            program_name = short_desc
+                            if episode_index and int(episode_index) > 0:
+                                program_name += f" 第{episode_index}集"
+
+                            programs.append(Program(
+                                channel_id=channel.channel_id,
+                                title=program_name,
+                                start_time=start_time,
+                                end_time=end_time,
+                                description="",
+                                raw_data={
+                                    'short_desc': short_desc,
+                                    'episode_index': episode_index,
+                                    'start_time_str': start_time_str,
+                                    'end_time_str': end_time_str
+                                }
+                            ))
+
+                except Exception as e:
+                    self.logger.warning(f"Failed to parse EPG item: {e}")
+                    continue
+
+        return programs
+
+
+# Create platform instance
+hoy_platform = HOYPlatform()
+
+
+# Legacy functions for backward compatibility
 def parse_epg_xml(xml_content, channel_name):
-    root = ET.fromstring(xml_content)
+    """Legacy function - parse EPG XML"""
+    try:
+        # Create a temporary channel object
+        channel = Channel(channel_id="temp", name=channel_name)
+        programs = hoy_platform._parse_epg_xml(xml_content, channel)
 
-    # UTC+8的日期（0点0分0秒）
-    shanghai_tz = pytz.timezone('Asia/Shanghai')
-    today = datetime.now(shanghai_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        # Convert to legacy format
+        results = []
+        for program in programs:
+            results.append({
+                "channelName": channel_name,
+                "programName": program.title,
+                "description": program.description,
+                "start": program.start_time,
+                "end": program.end_time
+            })
 
-    result = []
-
-    for channel in root.findall('./Channel'):
-        for epg_item in channel.findall('./EpgItem'):
-            start_time_str = epg_item.find('./EpgStartDateTime').text
-            end_time_str = epg_item.find('./EpgEndDateTime').text
-
-            # 解析开始和结束时间，并设置为上海时区
-            start_time = shanghai_tz.localize(datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S"))
-            end_time = shanghai_tz.localize(datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S"))
-
-            # 检查是否是今天或之后的节目
-            if start_time.date() >= today.date():
-                # 获取节目信息
-                episode_info = epg_item.find('./EpisodeInfo')
-                short_desc = episode_info.find('./EpisodeShortDescription').text
-                episode_index = episode_info.find('./EpisodeIndex').text
-
-                # 构建节目名称
-                program_name = short_desc
-                if int(episode_index) > 0:
-                    program_name += f" 第{episode_index}集"
-
-                # 构建输出项
-                item = {
-                    "channelName": channel_name,
-                    "programName": program_name,
-                    "description": "",
-                    "start": start_time,
-                    "end": end_time
-                }
-
-                result.append(item)
-
-    return result
+        return results
+    except Exception as e:
+        logger.error(f"Error in legacy parse_epg_xml: {e}")
+        return []
 
 
 async def get_hoy_lists():
-    url = "https://api2.hoy.tv/api/v3/a/channel"
-    response = requests.get(url)
-    channel_list = []
-    if response.status_code == 200:
-        data = response.json()
-        if data['code'] == 200:
-            for raw_channel in data['data']:
-                channel_list.append(
-                    {"channelName": raw_channel.get('name').get('zh_hk'),
-                     "rawEpg": raw_channel.get('epg'),
-                     "logo": raw_channel.get('logo')}
-                )
-            return channel_list
-    return None
+    """Legacy function - get HOY channel list"""
+    try:
+        channels = await hoy_platform.fetch_channels()
+
+        # Convert to legacy format
+        channel_list = []
+        for channel in channels:
+            channel_list.append({
+                "channelName": channel.name,
+                "rawEpg": channel.extra_data.get('epg_url', ''),
+                "logo": channel.extra_data.get('logo', '')
+            })
+
+        return channel_list
+    except Exception as e:
+        logger.error(f"Error in legacy get_hoy_lists: {e}")
+        return []
 
 
 async def get_hoy_epg():
-    channel_list = await get_hoy_lists()
-    programme_list = []
-    for channel in channel_list:
-        url = channel['rawEpg']
-        channel_name = channel['channelName']
-        response = requests.get(url)
-        if response.status_code == 200:
-            programme_list.extend(parse_epg_xml(response.text, channel_name))
-    return channel_list, programme_list
+    """Legacy function - fetch HOY EPG data"""
+    try:
+        channels = await hoy_platform.fetch_channels()
+        programs = await hoy_platform.fetch_programs(channels)
 
-# 参考数据：
-# {
-#   "code": 200,
-#   "data": [
-#     {
-#       "id": 1,
-#       "name": {
-#         "zh_hk": "HOY 國際財經台",
-#         "en": "HOY IBC"
-#       },
-#       "videos": {
-#         "id": 76,
-#         "channel_type": "NORMAL"
-#       },
-#       "default_channel": false,
-#       "synopsis": {
-#         "zh_hk": "\r\n"
-#       },
-#       "image": "https://storage.hoy.tv/v1/image/channel/1.jpg",
-#       "epg": "https://epg-file.hoy.tv/hoy/OTT7620250617.xml",
-#       "orientation": "landscape"
-#     },
-#     {
-#       "id": 2,
-#       "name": {
-#         "zh_hk": "HOY TV",
-#         "en": "HOY TV"
-#       },
-#       "videos": {
-#         "id": 77,
-#         "channel_type": "NORMAL"
-#       },
-#       "default_channel": true,
-#       "synopsis": {
-#         "zh_hk": ""
-#       },
-#       "image": "https://storage.hoy.tv/v1/image/channel/2.jpg",
-#       "epg": "https://epg-file.hoy.tv/hoy/OTT7720250617.xml",
-#       "orientation": "landscape"
-#     },
-#     {
-#       "id": 3,
-#       "name": {
-#         "zh_hk": "HOY 資訊台",
-#         "en": "HOY Infotainment"
-#       },
-#       "videos": {
-#         "id": 78,
-#         "channel_type": "NORMAL"
-#       },
-#       "default_channel": false,
-#       "synopsis": {
-#         "zh_hk": ""
-#       },
-#       "image": "https://storage.hoy.tv/v1/image/channel/3.jpg",
-#       "epg": "https://epg-file.hoy.tv/hoy/OTT7820250617.xml",
-#       "orientation": "landscape"
-#     }
-#   ]
-# }
+        # Convert to legacy format
+        raw_channels = []
+        raw_programs = []
+
+        for channel in channels:
+            raw_channels.append({
+                "channelName": channel.name,
+                "rawEpg": channel.extra_data.get('epg_url', ''),
+                "logo": channel.extra_data.get('logo', '')
+            })
+
+        for program in programs:
+            channel_name = next((ch.name for ch in channels if ch.channel_id == program.channel_id), "")
+            raw_programs.append({
+                "channelName": channel_name,
+                "programName": program.title,
+                "description": program.description,
+                "start": program.start_time,
+                "end": program.end_time
+            })
+
+        return raw_channels, raw_programs
+
+    except Exception as e:
+        logger.error(f"Error in legacy get_hoy_epg function: {e}", exc_info=True)
+        return [], []

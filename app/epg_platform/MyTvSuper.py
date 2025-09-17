@@ -1,148 +1,199 @@
-import os
-
 import pytz
-import requests
 from datetime import datetime, timedelta
+from typing import List, Tuple
 
-from dotenv import load_dotenv
-from loguru import logger
+from ..config import Config
+from ..logger import get_logger
+from ..http_client import get_http_client
+from ..utils import remove_brackets
+from .base import BaseEPGPlatform, Channel, Program
 
-from app.utils import remove_brackets
-
-load_dotenv(verbose=True, override=True)
-PROXY_HTTP = os.getenv("PROXY_HTTP", None)
-PROXY_HTTPS = os.getenv("PROXY_HTTPS", None)
-PROXIES = None
-
-platform_name = "tvb"
-
-if PROXY_HTTP and PROXY_HTTPS:
-    PROXIES = {
-        "http": PROXY_HTTP,
-        "https": PROXY_HTTP
-    }
+logger = get_logger(__name__)
 
 
-async def get_channels(force: bool = False):
-    logger.info(f"平台【{platform_name}】 正在执行更新")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6",
-        "Cache-Control": "no-cache",
-        "Origin": "https://www.mytvsuper.com",
-        "Pragma": "no-cache",
-        "Referer": "https://www.mytvsuper.com/",
-        "Sec-CH-UA": '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
-        "Sec-CH-UA-Mobile": "?0",
-        "Sec-CH-UA-Platform": '"macOS"',
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-site",
-    }
+class MyTvSuperPlatform(BaseEPGPlatform):
+    """MyTV Super (TVB) EPG platform implementation"""
 
-    params = {
-        "platform": "web",
-        "country_code": "HK",
-        "profile_class": 'general',
-    }
+    def __init__(self):
+        super().__init__("tvb")
+        self.base_url = "https://content-api.mytvsuper.com"
 
-    response = requests.get("https://content-api.mytvsuper.com/v1/channel/list", headers=headers, params=params,
-                            proxies=PROXIES)
-    if response.status_code == 200:
+    async def fetch_channels(self) -> List[Channel]:
+        """Fetch channel list from MyTV Super API"""
+        self.logger.info("Fetching channel list from MyTV Super")
+
+        headers = self.get_default_headers({
+            "Origin": "https://www.mytvsuper.com",
+            "Referer": "https://www.mytvsuper.com/",
+            "Sec-CH-UA": '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
+            "Sec-CH-UA-Mobile": "?0",
+            "Sec-CH-UA-Platform": '"macOS"',
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
+        })
+
+        params = {
+            "platform": "web",
+            "country_code": "HK",
+            "profile_class": "general",
+        }
+
+        response = self.http_client.get(
+            f"{self.base_url}/v1/channel/list",
+            headers=headers,
+            params=params
+        )
+
         data = response.json()
-        logger.info(data)
+        channels = []
 
-        rawChannels = []
-        rawPrograms = []
-        for channel in data['channels']:
-            channelName = remove_brackets(channel['name_tc'])
-            rawChannels.append({"channelName": channelName})
-            programData = await request_epg(network_code=channel['network_code'], channel_name=channelName)
-            rawPrograms.extend(programData)
+        for channel_data in data.get('channels', []):
+            channel_name = remove_brackets(channel_data.get('name_tc', ''))
+            if channel_name:
+                channels.append(Channel(
+                    channel_id=channel_data.get('network_code', ''),
+                    name=channel_name,
+                    network_code=channel_data.get('network_code', ''),
+                    raw_data=channel_data
+                ))
 
-        return rawChannels, rawPrograms
-    return [], []
+        self.logger.info(f"Found {len(channels)} channels from MyTV Super")
+        return channels
 
+    async def fetch_programs(self, channels: List[Channel]) -> List[Program]:
+        """Fetch program data for all channels"""
+        self.logger.info(f"Fetching program data for {len(channels)} channels")
 
-async def request_epg(network_code, channel_name):
-    logger.info("正在获取:" + channel_name)
-    # 获取当前日期
-    formatted_current_date = datetime.now().strftime('%Y%m%d')
+        all_programs = []
+        for channel in channels:
+            try:
+                programs = await self._fetch_channel_programs(
+                    channel.extra_data.get('network_code'),
+                    channel.name
+                )
+                all_programs.extend(programs)
+            except Exception as e:
+                self.logger.error(f"Failed to fetch programs for channel {channel.name}: {e}")
+                continue
 
-    # 获取7天后的日期
-    date_after_seven_days = datetime.now() + timedelta(days=7)
-    formatted_date_after_seven_days = date_after_seven_days.strftime('%Y%m%d')
+        self.logger.info(f"Fetched {len(all_programs)} programs total")
+        return all_programs
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6",
-        "Cache-Control": "no-cache",
-        "Origin": "https://www.mytvsuper.com",
-        "Pragma": "no-cache",
-        "Referer": "https://www.mytvsuper.com/",
-        "Sec-CH-UA": '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
-        "Sec-CH-UA-Mobile": "?0",
-        "Sec-CH-UA-Platform": '"macOS"',
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-site",
-    }
+    async def _fetch_channel_programs(self, network_code: str, channel_name: str) -> List[Program]:
+        """Fetch program data for a specific channel"""
+        self.logger.debug(f"Fetching programs for channel: {channel_name}")
 
-    params = {
-        "epg_platform": "web",
-        "country_code": "HK",
-        "network_code": network_code,
-        "from": formatted_current_date,
-        "to": formatted_date_after_seven_days,
-    }
+        # Get date range (today + 7 days)
+        start_date = datetime.now().strftime('%Y%m%d')
+        end_date = (datetime.now() + timedelta(days=7)).strftime('%Y%m%d')
 
-    response = requests.get("https://content-api.mytvsuper.com/v1/epg",
-                            params=params, headers=headers, proxies=PROXIES)
-    if response.status_code == 200:
-        logger.info(response.url)
+        headers = self.get_default_headers({
+            "Origin": "https://www.mytvsuper.com",
+            "Referer": "https://www.mytvsuper.com/",
+        })
+
+        params = {
+            "epg_platform": "web",
+            "country_code": "HK",
+            "network_code": network_code,
+            "from": start_date,
+            "to": end_date,
+        }
+
+        response = self.http_client.get(
+            f"{self.base_url}/v1/epg",
+            headers=headers,
+            params=params
+        )
+
         data = response.json()
+        programs = []
 
+        # Flatten the EPG data structure
         total_epg = []
-
         for day_data in data:
-            for item in day_data['item']:
-                epgs = item['epg']
+            for item in day_data.get('item', []):
+                epgs = item.get('epg', [])
                 for epg in epgs:
                     total_epg.append(epg)
 
-        epgResult = []
-
+        # Process each program
         for i, epg_program in enumerate(total_epg):
-            # 解析节目开始时间
-            start_time = datetime.strptime(epg_program['start_datetime'], "%Y-%m-%d %H:%M:%S")
-            program_name = epg_program['programme_title_tc']
-            program_description = epg_program['episode_synopsis_tc']
+            try:
+                # Parse start time
+                start_time_str = epg_program.get('start_datetime')
+                if not start_time_str:
+                    continue
 
-            # 计算结束时间，如果有下一个节目，则用下一个节目的开始时间
-            if i < len(total_epg) - 1:
-                next_epg = total_epg[i + 1]
-                next_start_time = datetime.strptime(next_epg['start_datetime'], "%Y-%m-%d %H:%M:%S")
-                end_time = next_start_time  # 当前节目的结束时间为下一个节目的开始时间
-            else:
-                # 如果是最后一个节目，可以设定一个默认的结束时间，比如加30分钟
-                end_time = start_time + timedelta(minutes=30)
+                start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
 
-            eastern_eight = pytz.timezone('Asia/Shanghai')
-            start_time_with_tz = eastern_eight.localize(start_time)
-            end_time_with_tz = eastern_eight.localize(end_time)
+                # Calculate end time based on next program or default duration
+                if i < len(total_epg) - 1:
+                    next_epg = total_epg[i + 1]
+                    next_start_time_str = next_epg.get('start_datetime')
+                    if next_start_time_str:
+                        end_time = datetime.strptime(next_start_time_str, "%Y-%m-%d %H:%M:%S")
+                    else:
+                        end_time = start_time + timedelta(minutes=30)
+                else:
+                    end_time = start_time + timedelta(minutes=30)
 
-            epgResult.append(
-                {"channelName": channel_name, "programName": program_name, "description": program_description,
-                 "start": start_time_with_tz, "end": end_time_with_tz
-                 }
-            )
+                # Convert to Asia/Shanghai timezone
+                eastern_eight = pytz.timezone('Asia/Shanghai')
+                start_time_with_tz = eastern_eight.localize(start_time)
+                end_time_with_tz = eastern_eight.localize(end_time)
 
-        return epgResult
+                programs.append(Program(
+                    channel_id=network_code,
+                    title=epg_program.get('programme_title_tc', ''),
+                    start_time=start_time_with_tz,
+                    end_time=end_time_with_tz,
+                    description=epg_program.get('episode_synopsis_tc', ''),
+                    raw_data=epg_program
+                ))
+
+            except Exception as e:
+                self.logger.warning(f"Failed to parse program data: {e}")
+                continue
+
+        self.logger.debug(f"Found {len(programs)} programs for {channel_name}")
+        return programs
+
+
+# Create platform instance
+mytvsuper_platform = MyTvSuperPlatform()
+
+
+# Legacy function for backward compatibility
+async def get_channels(force: bool = False):
+    """Legacy function - fetch channels and programs from MyTV Super"""
+    try:
+        channels = await mytvsuper_platform.fetch_channels()
+        programs = await mytvsuper_platform.fetch_programs(channels)
+
+        # Convert to legacy format
+        raw_channels = [{"channelName": ch.name} for ch in channels]
+        raw_programs = []
+
+        for program in programs:
+            raw_programs.append({
+                "channelName": next((ch.name for ch in channels if ch.channel_id == program.channel_id), ""),
+                "programName": program.title,
+                "description": program.description,
+                "start": program.start_time,
+                "end": program.end_time
+            })
+
+        return raw_channels, raw_programs
+
+    except Exception as e:
+        logger.error(f"Error in legacy get_channels function: {e}", exc_info=True)
+        return [], []
 
 
 def utc8_to_utc(local_time: datetime):
+    """Convert UTC+8 time to UTC (legacy utility function)"""
     eastern_eight = pytz.timezone('Asia/Shanghai')
     local_time_with_tz = eastern_eight.localize(local_time)
     utc_time = local_time_with_tz.astimezone(pytz.utc)
