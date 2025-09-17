@@ -16,6 +16,7 @@ from app.epg_platform.CN_epg_pw import get_cn_channels_epg
 from app.epg_platform.HOY import get_hoy_epg
 from app.epg_platform.NowTV import request_nowtv_today_epg
 from app.epg_platform.RTHK import get_rthk_epg
+from app.epg_platform.Starhub import get_starhub_epg
 
 logger.add("runtime.log", rotation="10 MB")
 
@@ -29,6 +30,7 @@ EPG_PLATFORMS = [
     {"platform": "astro", "fetcher": "request_astro_epg"},
     {"platform": "rthk", "fetcher": "request_rthk_epg"},
     {"platform": "hoy", "fetcher": "request_hoy_epg"},
+    {"platform": "starhub", "fetcher": "request_starhub_epg"},
 ]
 
 
@@ -164,6 +166,21 @@ async def request_now_tv_epg():
         print(f"今日nowtv epg已获取，不执行更新")
     # 删除旧的EPG
     delete_old_epg_file("nowtv")
+
+
+async def request_starhub_epg():
+    file_path = get_epg_file_name_today("starhub")
+    mkdir_if_need(file_path)
+    if not os.path.exists(file_path):
+        channels, programs = await get_starhub_epg()
+        response_xml = await gen_channel(channels, programs)
+        # 使用 with 语句打开文件，确保文件在操作完成后被正确关闭
+        with open(file_path, "wb") as file:
+            file.write(response_xml)
+    else:
+        print(f"今日Starhub epg已获取，不执行更新")
+    # 删除旧的EPG
+    delete_old_epg_file("starhub")
 
 
 def get_date_str():
