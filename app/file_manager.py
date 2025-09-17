@@ -195,7 +195,7 @@ class EPGFileManager:
             content=merged_xml,
             media_type="application/xml",
             headers={
-                "Content-Disposition": "inline; filename=epg.xml",
+                "Content-Disposition": "attachment; filename=epg.xml",
                 "X-Total-Channels": str(total_channels),
                 "X-Total-Programs": str(total_programs),
                 "X-Platforms": ",".join(platforms)
@@ -237,7 +237,7 @@ class EPGFileManager:
                 content=content,
                 media_type="application/xml",
                 headers={
-                    "Content-Disposition": f"inline; filename={platform}_epg.xml",
+                    "Content-Disposition": f"attachment; filename={platform}_epg.xml",
                     "X-Platform": platform,
                     "X-Total-Channels": str(channel_count),
                     "X-Total-Programs": str(program_count)
@@ -250,7 +250,7 @@ class EPGFileManager:
                 content=content,
                 media_type="application/xml",
                 headers={
-                    "Content-Disposition": f"inline; filename={platform}_epg.xml",
+                    "Content-Disposition": f"attachment; filename={platform}_epg.xml",
                     "X-Platform": platform
                 }
             )
