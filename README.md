@@ -82,11 +82,6 @@ services:
 ```
 
 
-```bash
-#部署并运行
-docker-compose build && docker-compose up -d
-```
-
 ### Docker Cli
 
 ```bash
