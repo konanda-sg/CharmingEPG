@@ -291,7 +291,7 @@ async def get_all_enabled_platforms_epg():
     return EPGFileManager.get_single_platform_epg("all")
 
 
-@app.get("/all.gz")
+@app.get("/all.xml.gz")
 async def get_all_enabled_platforms_epg_gz():
     """Get aggregated EPG data from all enabled platforms (cached, gzip compressed)"""
     from fastapi.responses import FileResponse
@@ -313,11 +313,11 @@ async def get_all_enabled_platforms_epg_gz():
         path=gz_file_path,
         media_type="application/gzip",
         headers={
-            "Content-Disposition": "attachment; filename=epg.xml.gz",
+            "Content-Disposition": "attachment; filename=all.xml.gz",
             "Cache-Control": f"public, max-age={Config.EPG_CACHE_TTL}, s-maxage={Config.EPG_CACHE_TTL}",
             "ETag": f'"epg-all-gz-{datetime.now().strftime("%Y%m%d")}"'
         },
-        filename="epg.xml.gz"
+        filename="all.xml.gz"
     )
 
 

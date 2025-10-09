@@ -106,7 +106,7 @@ docker run -d \
 
 ```
 http://[ip]:[port]/all  #xml
-http://[ip]:[port]/all.gz #gzip压缩包
+http://[ip]:[port]/all.xml.gz #gzip压缩包
 ```
 
 #### 请求单个或多个平台
