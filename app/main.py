@@ -286,16 +286,88 @@ async def get_custom_aggregate_epg(platforms: str = Query(..., description="Comm
 
 @app.get("/all")
 async def get_all_enabled_platforms_epg():
-    """Get aggregated EPG data from all enabled platforms"""
-    enabled_platforms = [p["platform"] for p in Config.get_enabled_platforms()]
-    logger.info(f"🌐 提供所有启用平台的聚合EPG数据服务: {enabled_platforms}")
-    return EPGFileManager.aggregate_epg_files(enabled_platforms)
+    """Get aggregated EPG data from all enabled platforms (cached)"""
+    logger.info(f"🌐 提供all平台的缓存EPG数据服务")
+    return EPGFileManager.get_single_platform_epg("all")
 
 
 async def gen_channel(channels, programs):
     """Generate EPG XML from channels and programs data"""
     from .epg.EpgGenerator import generateEpg
     return await generateEpg(channels, programs)
+
+
+async def generate_all_platforms_cache():
+    """Generate and cache merged EPG for all enabled platforms"""
+    enabled_platforms = [p["platform"] for p in Config.get_enabled_platforms()]
+
+    if not enabled_platforms:
+        logger.warning("⚠️ 没有启用任何平台，无法生成all缓存")
+        return
+
+    logger.info(f"🔄 开始生成all平台合并缓存: {enabled_platforms}")
+
+    try:
+        # Use existing aggregate logic to merge all platforms
+        import xml.etree.ElementTree as ET
+
+        merged_root = ET.Element("tv")
+        merged_root.set("generator-info-name", f"{Config.APP_NAME} v{Config.APP_VERSION}")
+        merged_root.set("generator-info-url", "https://github.com/your-repo/CharmingEPG")
+
+        channels_seen = set()
+        total_channels = 0
+        total_programs = 0
+
+        for platform in enabled_platforms:
+            content = EPGFileManager.read_epg_file(platform)
+            if not content:
+                logger.warning(f"⚠️ 未找到平台的EPG数据: {platform}")
+                continue
+
+            try:
+                platform_root = ET.fromstring(content)
+
+                # Process channels (first-come-first-served for duplicates)
+                platform_channels = 0
+                platform_programs = 0
+
+                for channel in platform_root.findall("./channel"):
+                    channel_id = channel.get("id")
+                    if channel_id and channel_id not in channels_seen:
+                        channels_seen.add(channel_id)
+                        merged_root.append(channel)
+                        platform_channels += 1
+
+                        # Add all programs for this channel
+                        for programme in platform_root.findall(f"./programme[@channel='{channel_id}']"):
+                            merged_root.append(programme)
+                            platform_programs += 1
+
+                total_channels += platform_channels
+                total_programs += platform_programs
+
+                logger.debug(f"🔀 从{platform}合并{platform_channels}个频道和{platform_programs}个节目")
+
+            except ET.ParseError as e:
+                logger.error(f"❌ 解析平台{platform}的XML失败: {e}")
+                continue
+
+        if total_channels == 0:
+            logger.error("❌ 任何平台都未找到有效的EPG数据，无法生成all缓存")
+            return
+
+        # Convert merged XML to bytes
+        merged_xml = ET.tostring(merged_root, encoding="utf-8", xml_declaration=True)
+
+        # Save to cache file using "all" as platform name
+        if EPGFileManager.save_epg_file("all", merged_xml):
+            logger.info(f"✨ 成功生成all缓存: {total_channels}个频道和{total_programs}个节目")
+        else:
+            logger.error("❌ 保存all缓存文件失败")
+
+    except Exception as e:
+        logger.error(f"💥 生成all缓存时发生错误: {e}", exc_info=True)
 
 
 async def update_all_enabled_platforms():
@@ -332,6 +404,9 @@ async def update_all_enabled_platforms():
             logger.debug(f"✅ 成功更新{platform_name}的EPG数据")
 
     logger.info(f"🎯 EPG数据更新完成: {success_count}个成功，{error_count}个失败")
+
+    # Generate merged cache for /all endpoint after updating all platforms
+    await generate_all_platforms_cache()
 
 
 @app.on_event("startup")
