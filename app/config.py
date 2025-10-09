@@ -57,7 +57,6 @@ class Config:
 
     # Platform configuration
     EPG_PLATFORMS = [
-        {"platform": "cn", "name": "CN (epg.pw)", "fetcher": "request_cn_epg"},
         {"platform": "tvb", "name": "MyTV Super", "fetcher": "request_my_tv_super_epg"},
         {"platform": "nowtv", "name": "NowTV", "fetcher": "request_now_tv_epg"},
         {"platform": "hami", "name": "Hami", "fetcher": "request_hami_epg"},
@@ -65,6 +64,7 @@ class Config:
         {"platform": "rthk", "name": "RTHK", "fetcher": "request_rthk_epg"},
         {"platform": "hoy", "name": "HOY", "fetcher": "request_hoy_epg"},
         {"platform": "starhub", "name": "StarHub", "fetcher": "request_starhub_epg"},
+        {"platform": "cn", "name": "CN (epg.pw)", "fetcher": "request_cn_epg"},
     ]
 
     @classmethod
