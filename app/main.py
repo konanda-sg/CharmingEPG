@@ -291,6 +291,36 @@ async def get_all_enabled_platforms_epg():
     return EPGFileManager.get_single_platform_epg("all")
 
 
+@app.get("/all.gz")
+async def get_all_enabled_platforms_epg_gz():
+    """Get aggregated EPG data from all enabled platforms (cached, gzip compressed)"""
+    from fastapi.responses import FileResponse
+    import os
+
+    logger.info(f"📦 提供all平台的gz压缩缓存EPG数据服务")
+
+    gz_file_path = EPGFileManager.get_epg_file_path("all").replace(".xml", ".xml.gz")
+
+    if not os.path.exists(gz_file_path):
+        logger.error(f"❌ 未找到all.gz压缩文件: {gz_file_path}")
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=404,
+            detail="Compressed EPG data not available. Please wait for next update cycle."
+        )
+
+    return FileResponse(
+        path=gz_file_path,
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": "attachment; filename=epg.xml.gz",
+            "Cache-Control": f"public, max-age={Config.EPG_CACHE_TTL}, s-maxage={Config.EPG_CACHE_TTL}",
+            "ETag": f'"epg-all-gz-{datetime.now().strftime("%Y%m%d")}"'
+        },
+        filename="epg.xml.gz"
+    )
+
+
 async def gen_channel(channels, programs):
     """Generate EPG XML from channels and programs data"""
     from .epg.EpgGenerator import generateEpg
@@ -310,6 +340,7 @@ async def generate_all_platforms_cache():
     try:
         # Use existing aggregate logic to merge all platforms
         import xml.etree.ElementTree as ET
+        import gzip
 
         merged_root = ET.Element("tv")
         merged_root.set("generator-info-name", f"{Config.APP_NAME} v{Config.APP_VERSION}")
@@ -366,6 +397,21 @@ async def generate_all_platforms_cache():
         else:
             logger.error("❌ 保存all缓存文件失败")
 
+        # Generate gzip compressed version
+        compressed_xml = gzip.compress(merged_xml, compresslevel=9)
+        gz_file_path = EPGFileManager.get_epg_file_path("all").replace(".xml", ".xml.gz")
+
+        try:
+            EPGFileManager.ensure_directory_exists(gz_file_path)
+            with open(gz_file_path, "wb") as gz_file:
+                gz_file.write(compressed_xml)
+
+            compression_ratio = len(compressed_xml) / len(merged_xml) * 100
+            saved_ratio = 100 - compression_ratio
+            logger.info(f"📦 成功生成all.gz压缩缓存: {len(compressed_xml)} 字节 (压缩至原来的 {compression_ratio:.1f}%，节省 {saved_ratio:.1f}%)")
+        except Exception as gz_error:
+            logger.error(f"❌ 保存all.gz压缩文件失败: {gz_error}")
+
     except Exception as e:
         logger.error(f"💥 生成all缓存时发生错误: {e}", exc_info=True)
 
@@ -391,6 +437,7 @@ async def update_all_enabled_platforms():
     # Process results and log any exceptions
     success_count = 0
     error_count = 0
+    any_platform_updated = False
 
     for i, result in enumerate(results):
         platform_config = enabled_platforms[i]
@@ -405,8 +452,17 @@ async def update_all_enabled_platforms():
 
     logger.info(f"🎯 EPG数据更新完成: {success_count}个成功，{error_count}个失败")
 
-    # Generate merged cache for /all endpoint after updating all platforms
-    await generate_all_platforms_cache()
+    # Check if all cache exists, if not, we need to generate it
+    all_cache_exists = EPGFileManager.read_epg_file("all") is not None
+
+    # Generate merged cache for /all endpoint if:
+    # 1. Cache doesn't exist (first run or new day)
+    # 2. At least one platform was updated successfully
+    if not all_cache_exists:
+        logger.info("📝 all缓存不存在，开始生成")
+        await generate_all_platforms_cache()
+    else:
+        logger.info("✅ all缓存已存在且所有平台均未更新，跳过重新生成")
 
 
 @app.on_event("startup")
