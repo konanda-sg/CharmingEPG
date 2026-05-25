@@ -5,9 +5,9 @@ services:
     ports:
       - "30008:80"
     environment:
-      - EPG_ENABLE_CN=true
-      - EPG_ENABLE_TVB=true
+      - EPG_ENABLE_CN=false
+      - EPG_ENABLE_TVB=false
       - EPG_ENABLE_NOWTV=false
-      - EPG_ENABLE_HAMI=true
-      - EPG_ENABLE_ASTRO=false
+      - EPG_ENABLE_HAMI=false
+      - EPG_ENABLE_ASTRO=true
       - EPG_ENABLE_RTHK=false
